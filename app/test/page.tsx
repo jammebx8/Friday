@@ -235,7 +235,7 @@ export default function AIChat() {
 
       const { data, error } = await supabase
         .from('users')
-        .select("id, email, name, gender, exam, avatar_url")
+        .select("id, email, name, avatar_url")
         .eq('id', user.id)
         .single();
 
