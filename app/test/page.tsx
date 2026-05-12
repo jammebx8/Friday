@@ -205,6 +205,7 @@ export default function AIChat() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -237,42 +238,60 @@ export default function AIChat() {
 
   const loadUserProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) {
+        console.warn('No authenticated user found');
+        return;
+      }
+
+      const { data, error } = await supabase
         .from('users')
-        .select("id, name,username,full_name, email, avatar_url, rookieCoinsEarned, exam")
+        .select("id, name, username, full_name, email, avatar_url, rookieCoinsEarned, exam")
         .eq('id', user.id)
         .single();
+
+      if (error) throw error;
       if (data) setUserProfile(data);
     } catch (err) {
       console.error('Error loading user profile:', err);
+      setError('Failed to load user profile');
     }
   };
 
   const loadConversations = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) {
+        console.warn('No authenticated user found');
+        return;
+      }
+
+      const { data, error } = await supabase
         .from('ai_conversations')
         .select('id, title, updated_at, persona_id')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
         .limit(30);
+
+      if (error) throw error;
       if (data) setConversations(data);
     } catch (err) {
       console.error('Error loading conversations:', err);
+      setError('Failed to load conversations');
     }
   };
 
   const loadConversation = async (convId: string) => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('ai_messages')
         .select('*')
         .eq('conversation_id', convId)
         .order('created_at', { ascending: true });
+
+      if (error) throw error;
       if (data) {
         setMessages(data.map(m => ({
           id: m.id,
@@ -282,6 +301,7 @@ export default function AIChat() {
           persona: m.persona_name,
         })));
       }
+
       const conv = conversations.find(c => c.id === convId);
       if (conv) {
         const persona = PERSONAS.find(p => p.id === conv.persona_id) || PERSONAS[0];
@@ -291,19 +311,32 @@ export default function AIChat() {
       setMobileSidebarOpen(false);
     } catch (err) {
       console.error('Error loading conversation:', err);
+      setError('Failed to load conversation');
     }
   };
 
   const createNewConversation = async (firstMessage: string, personaId: number): Promise<string | null> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) {
+        setError('User not authenticated');
+        return null;
+      }
+
       const title = firstMessage.slice(0, 60) + (firstMessage.length > 60 ? '...' : '');
-      const { data } = await supabase
+      
+      const { data, error } = await supabase
         .from('ai_conversations')
-        .insert({ user_id: user.id, title, persona_id: personaId })
+        .insert({
+          user_id: user.id,
+          title,
+          persona_id: personaId,
+        })
         .select()
         .single();
+
+      if (error) throw error;
       if (data) {
         setConversations(prev => [data, ...prev]);
         return data.id;
@@ -311,28 +344,44 @@ export default function AIChat() {
       return null;
     } catch (err) {
       console.error('Error creating conversation:', err);
+      setError('Failed to create conversation');
       return null;
     }
   };
 
   const saveMessage = async (convId: string, role: 'user' | 'assistant', content: string) => {
     try {
-      await supabase.from('ai_messages').insert({
+      const { error } = await supabase.from('ai_messages').insert({
         conversation_id: convId,
         role,
         content,
         persona_name: selectedPersona.name,
       });
+
+      if (error) throw error;
     } catch (err) {
       console.error('Error saving message:', err);
+      setError('Failed to save message');
     }
   };
 
   const deleteConversation = async (convId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await supabase.from('ai_messages').delete().eq('conversation_id', convId);
-      await supabase.from('ai_conversations').delete().eq('id', convId);
+      const { error: deleteMessagesError } = await supabase
+        .from('ai_messages')
+        .delete()
+        .eq('conversation_id', convId);
+
+      if (deleteMessagesError) throw deleteMessagesError;
+
+      const { error: deleteConvError } = await supabase
+        .from('ai_conversations')
+        .delete()
+        .eq('id', convId);
+
+      if (deleteConvError) throw deleteConvError;
+
       setConversations(prev => prev.filter(c => c.id !== convId));
       if (activeConversationId === convId) {
         setActiveConversationId(null);
@@ -340,6 +389,7 @@ export default function AIChat() {
       }
     } catch (err) {
       console.error('Error deleting conversation:', err);
+      setError('Failed to delete conversation');
     }
   };
 
@@ -355,12 +405,15 @@ export default function AIChat() {
     setInput('');
     setStreamingContent('');
     setMobileSidebarOpen(false);
+    setError(null);
     inputRef.current?.focus();
   };
 
   const handleSend = useCallback(async () => {
     const trimmed = input.trim();
     if (!trimmed || isLoading) return;
+
+    setError(null);
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -398,7 +451,9 @@ export default function AIChat() {
         signal: abortControllerRef.current.signal,
       });
 
-      if (!response.ok) throw new Error('API error');
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No reader');
@@ -447,10 +502,14 @@ export default function AIChat() {
 
     } catch (err: any) {
       if (err.name !== 'AbortError') {
+        console.error('Chat error:', err);
+        const errorMessage = err.message || 'Something went wrong. Please try again.';
+        setError(errorMessage);
+        
         const errMsg: Message = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: 'Something went wrong. Please try again.',
+          content: errorMessage,
           timestamp: new Date(),
           persona: selectedPersona.name,
         };
@@ -512,7 +571,9 @@ export default function AIChat() {
       audioRef.current = new Audio(url);
       audioRef.current.onended = () => setIsSpeaking(false);
       audioRef.current.play();
-    } catch {
+    } catch (err) {
+      console.error('TTS error:', err);
+      setError('Failed to play audio');
       setIsSpeaking(false);
     }
   };
@@ -529,7 +590,7 @@ export default function AIChat() {
 
   const handleVoiceInput = () => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Speech recognition not supported in this browser.');
+      setError('Speech recognition not supported in this browser.');
       return;
     }
     const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
@@ -575,7 +636,7 @@ export default function AIChat() {
   <div className="flex items-center gap-2">
     <img
       src="/fridaylogo.jpg"
-      alt="Axon Logo"
+      alt="Friday Logo"
       className="w-32 h-auto object-contain"
     />
   </div>
@@ -684,13 +745,13 @@ export default function AIChat() {
               <Image src={userProfile.avatar_url} alt="Avatar" width={32} height={32} className="object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
-                {userProfile?.username?.[0]?.toUpperCase() || 'U'}
+                {userProfile?.username?.[0]?.toUpperCase() || userProfile?.name?.[0]?.toUpperCase() || 'U'}
               </div>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-medium truncate">{userProfile?.full_name || userProfile?.username || 'User'}</p>
-            <p className="text-[#555] text-[10px] truncate">{userProfile?.username}</p>
+            <p className="text-white text-xs font-medium truncate">{userProfile?.full_name || userProfile?.name || userProfile?.username || 'User'}</p>
+            <p className="text-[#555] text-[10px] truncate">{userProfile?.username || userProfile?.email}</p>
           </div>
         </div>
       </div>
@@ -700,7 +761,7 @@ export default function AIChat() {
   // ─── RENDER ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a] text-white overflow-hidden font-['Inter',sans-serif]">
+    <div className="flex h-screen bg-[#000000] text-white overflow-hidden font-['Inter',sans-serif]">
 
       {/* ── DESKTOP SIDEBAR ─────────────────────────────────────── */}
       <AnimatePresence>
@@ -742,7 +803,7 @@ export default function AIChat() {
       </AnimatePresence>
 
       {/* ── MAIN AREA ────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#000000]">
 
         {/* Top bar */}
         <header className="flex items-center justify-between px-4 h-12 border-b border-white/5 flex-shrink-0">
@@ -777,6 +838,24 @@ export default function AIChat() {
           </div>
         </header>
 
+        {/* Error message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-300 text-sm"
+          >
+            {error}
+            <button
+              onClick={() => setError(null)}
+              className="ml-2 text-red-400 hover:text-red-300 underline"
+            >
+              Dismiss
+            </button>
+          </motion.div>
+        )}
+
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 && !streamingContent ? (
@@ -804,7 +883,10 @@ export default function AIChat() {
                   />
                 </div>
 
-     
+                <div className="text-center">
+                  <h1 className="text-xl font-bold text-white mb-1">{selectedPersona.name}</h1>
+                  <p className="text-[#666] text-sm">{selectedPersona.greeting}</p>
+                </div>
 
                 {/* Quick prompts */}
                 <div className="grid grid-cols-2 gap-2 mt-2 w-full max-w-md">
@@ -851,7 +933,7 @@ export default function AIChat() {
                           <Image src={userProfile.avatar_url} alt="You" width={32} height={32} className="object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">
-                            {userProfile?.username?.[0]?.toUpperCase() || 'Y'}
+                            {userProfile?.username?.[0]?.toUpperCase() || userProfile?.name?.[0]?.toUpperCase() || 'Y'}
                           </div>
                         )}
                       </div>
