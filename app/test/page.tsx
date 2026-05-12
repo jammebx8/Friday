@@ -17,7 +17,7 @@ type UserRow = {
     email?: string | null;
   };
 
-  
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -34,9 +34,13 @@ interface Conversation {
 }
 
 interface UserProfile {
-  id: string;
-  username: string;
-  avatar_url: string | null;
+    id: string;
+    name?: string | null;
+    exam?: string | null;
+    avatar_url?: string | null;
+    rookieCoinsEarned?: number | null;
+    email?: string | null;
+    username: string;
   full_name: string;
 }
 
@@ -237,7 +241,7 @@ export default function AIChat() {
       if (!user) return;
       const { data } = await supabase
         .from('users')
-        .select("id, name, email, avatar_url, rookieCoinsEarned, exam")
+        .select("id, name,username,full_name, email, avatar_url, rookieCoinsEarned, exam")
         .eq('id', user.id)
         .single();
       if (data) setUserProfile(data);
