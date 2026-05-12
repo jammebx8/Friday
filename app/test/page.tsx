@@ -8,16 +8,6 @@ import { gsap } from 'gsap';
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
-type UserRow = {
-    id: string;
-    name?: string | null;
-    exam?: string | null;
-    avatar_url?: string | null;
-    rookieCoinsEarned?: number | null;
-    email?: string | null;
-  };
-
-
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -34,14 +24,12 @@ interface Conversation {
 }
 
 interface UserProfile {
-    id: string;
-    name?: string | null;
-    exam?: string | null;
-    avatar_url?: string | null;
-    rookieCoinsEarned?: number | null;
-    email?: string | null;
-    username: string;
-  full_name: string;
+  id: string;
+  email: string;
+  name?: string | null;
+  gender?: string | null;
+  exam?: string | null;
+  avatar_url?: string | null;
 }
 
 interface Persona {
@@ -247,7 +235,7 @@ export default function AIChat() {
 
       const { data, error } = await supabase
         .from('users')
-        .select("id, name, username, full_name, email, avatar_url, rookieCoinsEarned, exam")
+        .select("id, email, name, gender, exam, avatar_url")
         .eq('id', user.id)
         .single();
 
@@ -625,32 +613,42 @@ export default function AIChat() {
     return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
   };
 
+  // Get display name for user
+  const getUserDisplayName = () => {
+    return userProfile?.name || userProfile?.email?.split('@')[0] || 'User';
+  };
+
+  // Get avatar initial
+  const getAvatarInitial = () => {
+    return (userProfile?.name?.[0] || userProfile?.email?.[0] || 'U').toUpperCase();
+  };
+
   const accentColor = selectedPersona.accent;
 
   // ─── SIDEBAR CONTENT ─────────────────────────────────────────────────────────
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-    {/* Logo & collapse */}
-<div className="flex items-center justify-between px-4 pb-4">
-  <div className="flex items-center gap-2">
-    <img
-      src="/fridaylogo.jpg"
-      alt="Friday Logo"
-      className="w-32 h-auto object-contain"
-    />
-  </div>
+      {/* Logo & collapse */}
+      <div className="flex items-center justify-between px-4 pb-4">
+        <div className="flex items-center gap-2">
+          <img
+            src="/fridaylogo.jpg"
+            alt="Friday Logo"
+            className="w-32 h-auto object-contain"
+          />
+        </div>
 
-  <button
-    onClick={() => { 
-      setSidebarOpen(false); 
-      setMobileSidebarOpen(false); 
-    }}
-    className="text-[#666] hover:text-white transition-colors p-1"
-  >
-    <CollapseIcon />
-  </button>
-</div>
+        <button
+          onClick={() => { 
+            setSidebarOpen(false); 
+            setMobileSidebarOpen(false); 
+          }}
+          className="text-[#666] hover:text-white transition-colors p-1"
+        >
+          <CollapseIcon />
+        </button>
+      </div>
 
       {/* New Chat */}
       <div className="px-3 pb-3">
@@ -745,13 +743,13 @@ export default function AIChat() {
               <Image src={userProfile.avatar_url} alt="Avatar" width={32} height={32} className="object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
-                {userProfile?.username?.[0]?.toUpperCase() || userProfile?.name?.[0]?.toUpperCase() || 'U'}
+                {getAvatarInitial()}
               </div>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-medium truncate">{userProfile?.full_name || userProfile?.name || userProfile?.username || 'User'}</p>
-            <p className="text-[#555] text-[10px] truncate">{userProfile?.username || userProfile?.email}</p>
+            <p className="text-white text-xs font-medium truncate">{getUserDisplayName()}</p>
+            <p className="text-[#555] text-[10px] truncate">{userProfile?.email}</p>
           </div>
         </div>
       </div>
@@ -933,7 +931,7 @@ export default function AIChat() {
                           <Image src={userProfile.avatar_url} alt="You" width={32} height={32} className="object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">
-                            {userProfile?.username?.[0]?.toUpperCase() || userProfile?.name?.[0]?.toUpperCase() || 'Y'}
+                            {getAvatarInitial()}
                           </div>
                         )}
                       </div>
