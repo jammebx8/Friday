@@ -42,7 +42,7 @@ const socialMediaLinks = [
   {
     label: 'Reddit',
     icon: '/reddit 3.png',
-    url: 'https://www.reddit.com/u/Possible_Loss4995/s/pcBd7G86Ic',
+    url: 'https://www.reddit.com/user/Last-Benefit2242/',
   },
   {
     label: 'Discord',
