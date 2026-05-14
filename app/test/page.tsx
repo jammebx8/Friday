@@ -407,7 +407,7 @@ export default function AIChat() {
     try {
       abortControllerRef.current = new AbortController();
 
-      const response = await fetch('/api/chat', {
+      const response = await fetch('https://rookieai.vercel.app/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
