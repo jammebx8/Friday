@@ -1,10 +1,16 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/public/src/utils/supabase';
 import { gsap } from 'gsap';
+
+// ── Component Imports ─────────────────────────────────────────────────────────
+import Sidebar from '../components/ai/Sidebar';
+import VoiceModeOverlay from '../components/ai/VoiceModeOverlay';
+import { detectUserMood, computeAIEmotion, EmotionProfile, getVoiceProsody } from '../components/ai/emotionEngine';
+import { SpeechRecognitionEngine, voiceEngine } from '../components/ai/voiceEngine';
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -52,7 +58,7 @@ const PERSONAS: Persona[] = [
     description: 'Sharp, witty, and brutally honest. Gets straight to the point.',
     avatar: '🤖',
     accent: '#FF6B35',
-    systemPrompt: 'You are Nova, a sharp and witty AI assistant. You are direct, honest, and efficient. You have a dry sense of humor and dont waste words. You help users effectively while being engaging.',
+    systemPrompt: 'You are Nova, a sharp and witty AI assistant. You are direct, honest, and efficient. You have a dry sense of humor and don\'t waste words. You help users effectively while being engaging.',
     greeting: "Let's cut to the chase. What do you need?",
     voiceStyle: 'confident',
   },
@@ -110,21 +116,15 @@ const VolumeIcon = ({ active }: { active?: boolean }) => (
   </svg>
 );
 
-const PlusIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-  </svg>
-);
-
-const ChevronIcon = ({ open }: { open: boolean }) => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-    <polyline points="6 9 12 15 18 9"/>
-  </svg>
-);
-
-const TrashIcon = () => (
+const CopyIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+  </svg>
+);
+
+const StopIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="4" y="4" width="16" height="16" rx="2"/>
   </svg>
 );
 
@@ -140,32 +140,21 @@ const CollapseIcon = () => (
   </svg>
 );
 
-const CopyIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-  </svg>
-);
-
-const StopIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-    <rect x="4" y="4" width="16" height="16" rx="2"/>
-  </svg>
-);
-
-const WaveformIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <line x1="12" y1="2" x2="12" y2="22"/><line x1="8" y1="5" x2="8" y2="19"/><line x1="4" y1="8" x2="4" y2="16"/><line x1="16" y1="5" x2="16" y2="19"/><line x1="20" y1="8" x2="20" y2="16"/>
+const ChevronIcon = ({ open }: { open: boolean }) => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+    <polyline points="6 9 12 15 18 9"/>
   </svg>
 );
 
 // ─── TYPING INDICATOR ─────────────────────────────────────────────────────────
 
-const TypingIndicator = () => (
+const TypingIndicator = ({ color }: { color: string }) => (
   <div className="flex items-center gap-1 px-4 py-3">
     {[0, 1, 2].map(i => (
       <motion.div
         key={i}
-        className="w-2 h-2 rounded-full bg-[#444]"
+        className="w-2 h-2 rounded-full"
+        style={{ background: color + '88' }}
         animate={{ scale: [1, 1.4, 1], opacity: [0.4, 1, 0.4] }}
         transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
       />
@@ -173,10 +162,32 @@ const TypingIndicator = () => (
   </div>
 );
 
+// ─── EMOTION INDICATOR ────────────────────────────────────────────────────────
+
+const EmotionDot = ({ emotion, color }: { emotion: string; color: string }) => {
+  const emotionEmoji: Record<string, string> = {
+    neutral: '😐', warm: '🤗', excited: '✨', concerned: '🤔',
+    playful: '😄', focused: '🎯', empathetic: '💙', curious: '🔍',
+    proud: '🌟', gentle: '🌸',
+  };
+  return (
+    <motion.div
+      className="flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px]"
+      style={{ borderColor: color + '44', background: color + '11', color: color }}
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      key={emotion}
+    >
+      <span>{emotionEmoji[emotion] || '😐'}</span>
+      <span className="capitalize">{emotion}</span>
+    </motion.div>
+  );
+};
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function AIChat() {
-  // State
+  // Core state
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -184,25 +195,42 @@ export default function AIChat() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [showPersonaModal, setShowPersonaModal] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // UI state
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showPersonaModal, setShowPersonaModal] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
+
+  // Emotion state (persisted across turns)
+  const [emotionProfile, setEmotionProfile] = useState<EmotionProfile>({
+    current: 'neutral',
+    intensity: 0.5,
+    valence: 0,
+    energy: 0.3,
+    history: [],
+  });
+
+  // Voice state
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [isAISpeaking, setIsAISpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isUserSpeaking, setIsUserSpeaking] = useState(false);
+  const [voiceLevel, setVoiceLevel] = useState(0);
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const [lastAIMessage, setLastAIMessage] = useState('');
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const sttRef = useRef<SpeechRecognitionEngine | null>(null);
 
-  // ─── EFFECTS ────────────────────────────────────────────────────────────────
+  // ─── EFFECTS ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
     loadUserProfile();
@@ -210,7 +238,7 @@ export default function AIChat() {
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
 
   useEffect(() => {
@@ -222,64 +250,49 @@ export default function AIChat() {
     }
   }, [messages.length]);
 
-  // ─── SUPABASE ────────────────────────────────────────────────────────────────
+  const accentColor = selectedPersona.accent;
+
+  // ─── SUPABASE ─────────────────────────────────────────────────────────────
 
   const loadUserProfile = async () => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      if (!user) {
-        console.warn('No authenticated user found');
-        return;
-      }
-
-      const { data, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
         .from('users')
-        .select("id, email, name, avatar_url")
+        .select('id, email, name, avatar_url')
         .eq('id', user.id)
         .single();
-
-      if (error) throw error;
       if (data) setUserProfile(data);
     } catch (err) {
       console.error('Error loading user profile:', err);
-      setError('Failed to load user profile');
     }
   };
 
   const loadConversations = async () => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      if (!user) {
-        console.warn('No authenticated user found');
-        return;
-      }
-
-      const { data, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
         .from('ai_conversations')
         .select('id, title, updated_at, persona_id')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
         .limit(30);
-
-      if (error) throw error;
       if (data) setConversations(data);
     } catch (err) {
       console.error('Error loading conversations:', err);
-      setError('Failed to load conversations');
     }
   };
 
   const loadConversation = async (convId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('ai_messages')
         .select('*')
         .eq('conversation_id', convId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
       if (data) {
         setMessages(data.map(m => ({
           id: m.id,
@@ -299,32 +312,19 @@ export default function AIChat() {
       setMobileSidebarOpen(false);
     } catch (err) {
       console.error('Error loading conversation:', err);
-      setError('Failed to load conversation');
     }
   };
 
   const createNewConversation = async (firstMessage: string, personaId: number): Promise<string | null> => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      if (!user) {
-        setError('User not authenticated');
-        return null;
-      }
-
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
       const title = firstMessage.slice(0, 60) + (firstMessage.length > 60 ? '...' : '');
-      
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('ai_conversations')
-        .insert({
-          user_id: user.id,
-          title,
-          persona_id: personaId,
-        })
+        .insert({ user_id: user.id, title, persona_id: personaId })
         .select()
         .single();
-
-      if (error) throw error;
       if (data) {
         setConversations(prev => [data, ...prev]);
         return data.id;
@@ -332,44 +332,28 @@ export default function AIChat() {
       return null;
     } catch (err) {
       console.error('Error creating conversation:', err);
-      setError('Failed to create conversation');
       return null;
     }
   };
 
   const saveMessage = async (convId: string, role: 'user' | 'assistant', content: string) => {
     try {
-      const { error } = await supabase.from('ai_messages').insert({
+      await supabase.from('ai_messages').insert({
         conversation_id: convId,
         role,
         content,
         persona_name: selectedPersona.name,
       });
-
-      if (error) throw error;
     } catch (err) {
       console.error('Error saving message:', err);
-      setError('Failed to save message');
     }
   };
 
-  const deleteConversation = async (convId: string, e: React.MouseEvent) => {
+  const deleteConversation = useCallback(async (convId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const { error: deleteMessagesError } = await supabase
-        .from('ai_messages')
-        .delete()
-        .eq('conversation_id', convId);
-
-      if (deleteMessagesError) throw deleteMessagesError;
-
-      const { error: deleteConvError } = await supabase
-        .from('ai_conversations')
-        .delete()
-        .eq('id', convId);
-
-      if (deleteConvError) throw deleteConvError;
-
+      await supabase.from('ai_messages').delete().eq('conversation_id', convId);
+      await supabase.from('ai_conversations').delete().eq('id', convId);
       setConversations(prev => prev.filter(c => c.id !== convId));
       if (activeConversationId === convId) {
         setActiveConversationId(null);
@@ -377,28 +361,13 @@ export default function AIChat() {
       }
     } catch (err) {
       console.error('Error deleting conversation:', err);
-      setError('Failed to delete conversation');
     }
-  };
+  }, [activeConversationId]);
 
-  // ─── CHAT ────────────────────────────────────────────────────────────────────
+  // ─── CHAT SEND ────────────────────────────────────────────────────────────
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const handleNewChat = () => {
-    setMessages([]);
-    setActiveConversationId(null);
-    setInput('');
-    setStreamingContent('');
-    setMobileSidebarOpen(false);
-    setError(null);
-    inputRef.current?.focus();
-  };
-
-  const handleSend = useCallback(async () => {
-    const trimmed = input.trim();
+  const handleSend = useCallback(async (overrideText?: string) => {
+    const trimmed = (overrideText || input).trim();
     if (!trimmed || isLoading) return;
 
     setError(null);
@@ -415,7 +384,16 @@ export default function AIChat() {
     setIsLoading(true);
     setStreamingContent('');
 
-    // Determine or create conversation
+    // Detect mood for immediate emotion update
+    const { detectedEmotion, mood } = detectUserMood(trimmed);
+    const newEmotion = computeAIEmotion(
+      detectedEmotion,
+      selectedPersona.id,
+      emotionProfile.history,
+      emotionProfile.current
+    );
+    setEmotionProfile(newEmotion);
+
     let convId = activeConversationId;
     if (!convId) {
       convId = await createNewConversation(trimmed, selectedPersona.id);
@@ -424,24 +402,32 @@ export default function AIChat() {
 
     if (convId) await saveMessage(convId, 'user', trimmed);
 
+    const { data: { user } } = await supabase.auth.getUser();
+
     try {
       abortControllerRef.current = new AbortController();
-      const response = await fetch('https://rookie-backend.vercel.app/api/chat', {
+
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: trimmed,
           conversationId: convId,
           personaId: selectedPersona.id,
-          personaPrompt: selectedPersona.systemPrompt,
-          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+          personaName: selectedPersona.name,
+          personaBasePrompt: selectedPersona.systemPrompt,
+          personaVoiceStyle: selectedPersona.voiceStyle,
+          history: messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
+          userId: user?.id,
+          userName: userProfile?.name,
+          isVoiceMode: voiceMode,
+          emotionHistory: emotionProfile.history,
+          currentEmotion: emotionProfile.current,
         }),
         signal: abortControllerRef.current.signal,
       });
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No reader');
@@ -460,7 +446,14 @@ export default function AIChat() {
             if (data === '[DONE]') break;
             try {
               const parsed = JSON.parse(data);
-              if (parsed.content) {
+              if (parsed.type === 'meta' && parsed.emotionProfile) {
+                // Update emotion from server-confirmed state
+                setEmotionProfile(parsed.emotionProfile);
+              } else if (parsed.type === 'content' && parsed.content) {
+                accumulated += parsed.content;
+                setStreamingContent(accumulated);
+              } else if (parsed.content) {
+                // backwards compat
                 accumulated += parsed.content;
                 setStreamingContent(accumulated);
               }
@@ -479,94 +472,141 @@ export default function AIChat() {
 
       setMessages(prev => [...prev, aiMsg]);
       setStreamingContent('');
-      if (convId) await saveMessage(convId, 'assistant', accumulated);
+      setLastAIMessage(accumulated);
 
-      // Update conversation timestamp
+      if (convId) await saveMessage(convId, 'assistant', accumulated);
       if (convId) {
         await supabase.from('ai_conversations')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', convId);
       }
 
+      // Auto-speak in voice mode
+      if (voiceMode && accumulated) {
+        const prosody = getVoiceProsody(newEmotion, selectedPersona.voiceStyle);
+        setIsAISpeaking(true);
+        voiceEngine.speak(
+          accumulated,
+          prosody,
+          selectedPersona.voiceStyle,
+          () => setIsAISpeaking(true),
+          () => {
+            setIsAISpeaking(false);
+            // Auto-restart listening after AI finishes speaking
+            if (voiceMode) startListening();
+          }
+        );
+      }
+
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         console.error('Chat error:', err);
-        const errorMessage = err.message || 'Something went wrong. Please try again.';
-        setError(errorMessage);
-        
-        const errMsg: Message = {
+        setError(err.message || 'Something went wrong.');
+        setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: errorMessage,
+          content: 'Sorry, something went wrong. Please try again.',
           timestamp: new Date(),
           persona: selectedPersona.name,
-        };
-        setMessages(prev => [...prev, errMsg]);
+        }]);
       }
     } finally {
       setIsLoading(false);
       setStreamingContent('');
     }
-  }, [input, isLoading, activeConversationId, messages, selectedPersona]);
+  }, [input, isLoading, activeConversationId, messages, selectedPersona, emotionProfile, voiceMode, userProfile]);
 
   const handleStop = () => {
     abortControllerRef.current?.abort();
     if (streamingContent) {
-      const aiMsg: Message = {
+      setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: streamingContent,
         timestamp: new Date(),
         persona: selectedPersona.name,
-      };
-      setMessages(prev => [...prev, aiMsg]);
+      }]);
     }
     setStreamingContent('');
     setIsLoading(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  // ─── VOICE ────────────────────────────────────────────────────────────────
 
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
-    e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
-  };
-
-  // ─── TTS ─────────────────────────────────────────────────────────────────────
-
-  const handleSpeak = async (text: string) => {
-    if (isSpeaking) {
-      audioRef.current?.pause();
-      setIsSpeaking(false);
+  const startListening = useCallback(() => {
+    if (!SpeechRecognitionEngine.isSupported()) {
+      setError('Voice not supported in this browser');
       return;
     }
-    try {
-      setIsSpeaking(true);
-      const response = await fetch('https://rookie-backend.vercel.app/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voiceStyle: selectedPersona.voiceStyle }),
-      });
-      if (!response.ok) throw new Error('TTS failed');
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      audioRef.current = new Audio(url);
-      audioRef.current.onended = () => setIsSpeaking(false);
-      audioRef.current.play();
-    } catch (err) {
-      console.error('TTS error:', err);
-      setError('Failed to play audio');
-      setIsSpeaking(false);
+
+    sttRef.current?.stop();
+
+    sttRef.current = new SpeechRecognitionEngine(
+      (result) => {
+        setLiveTranscript(result.transcript);
+        if (result.isFinal && result.transcript.trim()) {
+          setLiveTranscript('');
+          handleSend(result.transcript.trim());
+          sttRef.current?.stop();
+          setIsListening(false);
+        }
+      },
+      () => setIsListening(false),
+      (err) => { setError(`Voice error: ${err}`); setIsListening(false); }
+    );
+
+    sttRef.current.start();
+    setIsListening(true);
+  }, [handleSend]);
+
+  const stopListening = useCallback(() => {
+    sttRef.current?.stop();
+    setIsListening(false);
+    setLiveTranscript('');
+  }, []);
+
+  const toggleVoiceMode = () => {
+    if (voiceMode) {
+      voiceEngine.stop();
+      stopListening();
+      setVoiceMode(false);
+      setIsAISpeaking(false);
+    } else {
+      setVoiceMode(true);
     }
   };
 
-  // ─── COPY ────────────────────────────────────────────────────────────────────
+  // Text-to-speech for individual messages
+  const handleSpeak = useCallback((text: string) => {
+    if (isAISpeaking) {
+      voiceEngine.stop();
+      setIsAISpeaking(false);
+      return;
+    }
+    const prosody = getVoiceProsody(emotionProfile, selectedPersona.voiceStyle);
+    setIsAISpeaking(true);
+    voiceEngine.speak(text, prosody, selectedPersona.voiceStyle,
+      () => setIsAISpeaking(true),
+      () => setIsAISpeaking(false)
+    );
+  }, [isAISpeaking, emotionProfile, selectedPersona]);
+
+  // ─── TEXT INPUT ───────────────────────────────────────────────────────────
+
+  const handleVoiceInput = () => {
+    if (!SpeechRecognitionEngine.isSupported()) {
+      setError('Speech recognition not supported');
+      return;
+    }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SR();
+    recognition.lang = 'en-IN';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (e: any) => setInput(e.results[0][0].transcript);
+    recognition.onerror = () => {};
+    recognition.start();
+  };
 
   const handleCopy = async (id: string, text: string) => {
     await navigator.clipboard.writeText(text);
@@ -574,194 +614,54 @@ export default function AIChat() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // ─── VOICE INPUT ─────────────────────────────────────────────────────────────
+  const handleNewChat = useCallback(() => {
+    setMessages([]);
+    setActiveConversationId(null);
+    setInput('');
+    setStreamingContent('');
+    setMobileSidebarOpen(false);
+    setError(null);
+    inputRef.current?.focus();
+  }, []);
 
-  const handleVoiceInput = () => {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      setError('Speech recognition not supported in this browser.');
-      return;
-    }
-    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    const recognition = new SR();
-    recognition.lang = 'en-IN';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    setIsRecording(true);
-    recognition.onresult = (e: any) => {
-      setInput(e.results[0][0].transcript);
-      setIsRecording(false);
-    };
-    recognition.onerror = () => setIsRecording(false);
-    recognition.onend = () => setIsRecording(false);
-    recognition.start();
-  };
+  const formatTime = (d: Date) =>
+    new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit', hour12: true }).format(d);
 
-  // ─── UI HELPERS ───────────────────────────────────────────────────────────────
+  const getAvatarInitial = () =>
+    (userProfile?.name?.[0] || userProfile?.email?.[0] || 'U').toUpperCase();
 
-  const formatTime = (d: Date) => {
-    return new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit', hour12: true }).format(d);
-  };
+  // Stable sidebar callbacks — prevent sidebar re-renders when chat state changes
+  const handleLoadConversation = useCallback(loadConversation, [conversations]);
+  const handleToggleHistory = useCallback(() => setHistoryOpen(o => !o), []);
+  const handleOpenPersonaModal = useCallback(() => setShowPersonaModal(true), []);
+  const handleSidebarCollapse = useCallback(() => {
+    setSidebarOpen(false);
+    setMobileSidebarOpen(false);
+  }, []);
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diff = now.getTime() - d.getTime();
-    const days = Math.floor(diff / 86400000);
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return `${days}d ago`;
-    return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
-  };
-
-  // Get display name for user
-  const getUserDisplayName = () => {
-    return userProfile?.name || userProfile?.email?.split('@')[0] || 'User';
-  };
-
-  // Get avatar initial
-  const getAvatarInitial = () => {
-    return (userProfile?.name?.[0] || userProfile?.email?.[0] || 'U').toUpperCase();
-  };
-
-  const accentColor = selectedPersona.accent;
-
-  // ─── SIDEBAR CONTENT ─────────────────────────────────────────────────────────
-
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      {/* Logo & collapse */}
-      <div className="flex items-center justify-between px-4 pb-4">
-        <div className="flex items-center gap-2">
-          <img
-            src="/fridaylogo.jpg"
-            alt="Friday Logo"
-            className="w-32 h-auto object-contain"
-          />
-        </div>
-
-        <button
-          onClick={() => { 
-            setSidebarOpen(false); 
-            setMobileSidebarOpen(false); 
-          }}
-          className="text-[#666] hover:text-white transition-colors p-1"
-        >
-          <CollapseIcon />
-        </button>
-      </div>
-
-      {/* New Chat */}
-      <div className="px-3 pb-3">
-        <button
-          onClick={handleNewChat}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[#ccc] hover:text-white hover:bg-white/5 transition-all text-sm font-medium border border-transparent hover:border-white/10"
-        >
-          <PlusIcon />
-          <span>New Chat</span>
-        </button>
-      </div>
-
-      {/* Persona selector */}
-      <div className="px-3 pb-3">
-        <button
-          onClick={() => setShowPersonaModal(true)}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-all border border-white/10"
-        >
-          <div className="w-8 h-8 rounded-lg text-lg flex items-center justify-center" style={{ background: `${accentColor}22` }}>
-            {selectedPersona.avatar}
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-white text-xs font-semibold">{selectedPersona.name}</p>
-            <p className="text-[#555] text-[10px]">Active persona</p>
-          </div>
-          <ChevronIcon open={showPersonaModal} />
-        </button>
-      </div>
-
-      <div className="px-3 pb-2">
-        <div className="h-px bg-white/5" />
-      </div>
-
-      {/* History */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide px-3">
-        <button
-          onClick={() => setHistoryOpen(o => !o)}
-          className="w-full flex items-center justify-between px-2 py-2 text-[#666] hover:text-[#999] transition-colors"
-        >
-          <span className="text-[11px] font-semibold uppercase tracking-widest">History</span>
-          <ChevronIcon open={historyOpen} />
-        </button>
-
-        <AnimatePresence>
-          {historyOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="space-y-0.5 pb-4">
-                {conversations.length === 0 && (
-                  <p className="text-[#444] text-xs px-2 py-4 text-center">No conversations yet</p>
-                )}
-                {conversations.map(conv => (
-                  <motion.div
-                    key={conv.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className={`group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all ${
-                      activeConversationId === conv.id
-                        ? 'bg-white/8 text-white'
-                        : 'text-[#666] hover:text-[#ccc] hover:bg-white/4'
-                    }`}
-                    onClick={() => loadConversation(conv.id)}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs truncate font-medium">{conv.title}</p>
-                      <p className="text-[10px] text-[#444] mt-0.5">{formatDate(conv.updated_at)}</p>
-                    </div>
-                    <button
-                      onClick={(e) => deleteConversation(conv.id, e)}
-                      className="opacity-0 group-hover:opacity-100 text-[#444] hover:text-red-400 transition-all p-0.5"
-                    >
-                      <TrashIcon />
-                    </button>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* User profile */}
-      <div className="px-3 py-3 border-t border-white/5">
-        <div className="flex items-center gap-3 px-2 py-2">
-          <div className="w-8 h-8 rounded-full bg-white/10 overflow-hidden flex-shrink-0">
-            {userProfile?.avatar_url ? (
-              <Image src={userProfile.avatar_url} alt="Avatar" width={32} height={32} className="object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
-                {getAvatarInitial()}
-              </div>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-medium truncate">{getUserDisplayName()}</p>
-            <p className="text-[#555] text-[10px] truncate">{userProfile?.email}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ─── RENDER ───────────────────────────────────────────────────────────────────
+  // ─── RENDER ───────────────────────────────────────────────────────────────
 
   return (
     <div className="flex h-screen bg-[#000000] text-white overflow-hidden font-['Inter',sans-serif]">
 
-      {/* ── DESKTOP SIDEBAR ─────────────────────────────────────── */}
+      {/* VOICE MODE OVERLAY */}
+      <VoiceModeOverlay
+        isOpen={voiceMode}
+        personaName={selectedPersona.name}
+        personaAvatar={selectedPersona.avatar}
+        accentColor={accentColor}
+        isAISpeaking={isAISpeaking}
+        isUserSpeaking={isUserSpeaking}
+        voiceLevel={voiceLevel}
+        liveTranscript={liveTranscript}
+        lastAIMessage={lastAIMessage}
+        onClose={toggleVoiceMode}
+        onStartListening={startListening}
+        onStopListening={stopListening}
+        isListening={isListening}
+      />
+
+      {/* DESKTOP SIDEBAR */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside
@@ -771,50 +671,69 @@ export default function AIChat() {
             transition={{ duration: 0.25, ease: 'easeInOut' }}
             className="hidden md:block flex-shrink-0 bg-[#000000] border-r border-white/5 overflow-hidden"
           >
-            <SidebarContent />
+            <Sidebar
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              selectedPersona={selectedPersona}
+              userProfile={userProfile}
+              historyOpen={historyOpen}
+              showPersonaModal={showPersonaModal}
+              onNewChat={handleNewChat}
+              onLoadConversation={handleLoadConversation}
+              onDeleteConversation={deleteConversation}
+              onToggleHistory={handleToggleHistory}
+              onOpenPersonaModal={handleOpenPersonaModal}
+              onCollapse={handleSidebarCollapse}
+            />
           </motion.aside>
         )}
       </AnimatePresence>
 
-      {/* ── MOBILE SIDEBAR OVERLAY ───────────────────────────────── */}
+      {/* MOBILE SIDEBAR */}
       <AnimatePresence>
         {mobileSidebarOpen && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="md:hidden fixed inset-0 bg-black z-40"
               onClick={() => setMobileSidebarOpen(false)}
             />
             <motion.aside
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
+              initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="md:hidden fixed left-0 top-0 bottom-0 w-[260px] bg-[#000000] border-r border-white/5 z-50"
             >
-              <SidebarContent />
+              <Sidebar
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                selectedPersona={selectedPersona}
+                userProfile={userProfile}
+                historyOpen={historyOpen}
+                showPersonaModal={showPersonaModal}
+                onNewChat={handleNewChat}
+                onLoadConversation={handleLoadConversation}
+                onDeleteConversation={deleteConversation}
+                onToggleHistory={handleToggleHistory}
+                onOpenPersonaModal={handleOpenPersonaModal}
+                onCollapse={handleSidebarCollapse}
+              />
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
-      {/* ── MAIN AREA ────────────────────────────────────────────── */}
+      {/* MAIN AREA */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#000000]">
 
         {/* Top bar */}
         <header className="flex items-center justify-between px-4 h-12 border-b border-white/5 flex-shrink-0">
           <div className="flex items-center gap-3">
-            {/* Hamburger / expand */}
             <button
               onClick={() => { setSidebarOpen(o => !o); setMobileSidebarOpen(o => !o); }}
               className="text-[#666] hover:text-white transition-colors p-1"
             >
               {sidebarOpen ? <CollapseIcon /> : <MenuIcon />}
             </button>
-
-            {/* Active persona badge */}
             <button
               onClick={() => setShowPersonaModal(true)}
               className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/8 transition-all border border-white/8"
@@ -826,295 +745,211 @@ export default function AIChat() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* "Private" pill */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/8">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-              <span className="text-xs text-[#999]">Private</span>
-            </div>
+            {/* Emotion indicator */}
+            <EmotionDot emotion={emotionProfile.current} color={accentColor} />
+
+            {/* Voice mode toggle */}
+            <button
+              onClick={toggleVoiceMode}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs transition-all ${
+                voiceMode
+                  ? 'bg-white/10 border-white/20 text-white'
+                  : 'bg-white/5 border-white/8 text-[#999] hover:text-white'
+              }`}
+            >
+              <MicIcon active={voiceMode} />
+              <span className="hidden sm:inline">{voiceMode ? 'Voice On' : 'Voice'}</span>
+            </button>
           </div>
         </header>
 
-        {/* Error message */}
+        {/* Error */}
         {error && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-300 text-sm"
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="px-4 py-3 bg-red-500/10 border-b border-red-500/20 text-red-300 text-sm flex items-center justify-between"
           >
-            {error}
-            <button
-              onClick={() => setError(null)}
-              className="ml-2 text-red-400 hover:text-red-300 underline"
-            >
-              Dismiss
-            </button>
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 ml-4">✕</button>
           </motion.div>
         )}
 
-        {/* Messages area */}
-        <div className="flex-1 overflow-y-auto">
-          {messages.length === 0 && !streamingContent ? (
-            /* Empty state */
-            <div className="flex flex-col items-center justify-center h-full px-4">
-              <motion.div
-                ref={logoRef}
-                className="flex flex-col items-center gap-6"
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6" style={{ scrollbarWidth: 'none' }}>
+          {messages.length === 0 && !isLoading && (
+            <div ref={logoRef} className="flex flex-col items-center justify-center h-full gap-6 opacity-0">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+                style={{ background: `${accentColor}22`, border: `1px solid ${accentColor}44` }}
               >
-                {/* Animated logo */}
-                <div className="relative">
-                  <motion.div
-                    className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl"
-                    style={{ background: `linear-gradient(135deg, ${accentColor}33, ${accentColor}11)`, border: `1px solid ${accentColor}33` }}
-                    animate={{ boxShadow: [`0 0 20px ${accentColor}22`, `0 0 40px ${accentColor}44`, `0 0 20px ${accentColor}22`] }}
-                    transition={{ duration: 3, repeat: Infinity }}
+                {selectedPersona.avatar}
+              </div>
+              <div className="text-center max-w-xs">
+                <p className="text-white font-semibold text-lg mb-1">{selectedPersona.name}</p>
+                <p className="text-[#555] text-sm">{selectedPersona.greeting}</p>
+              </div>
+              <div className="flex gap-2 flex-wrap justify-center">
+                {['What can you help me with?', 'Tell me about yourself', 'Let\'s chat'].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => handleSend(s)}
+                    className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[#999] hover:text-white hover:bg-white/8 text-xs transition-all"
                   >
-                    {selectedPersona.avatar}
-                  </motion.div>
-                  <motion.div
-                    className="absolute inset-0 rounded-2xl"
-                    style={{ border: `1px solid ${accentColor}` }}
-                    animate={{ opacity: [0, 0.4, 0], scale: [1, 1.3, 1.6] }}
-                    transition={{ duration: 2.5, repeat: Infinity }}
-                  />
-                </div>
-
-                <div className="text-center">
-                  <h1 className="text-xl font-bold text-white mb-1">{selectedPersona.name}</h1>
-                  <p className="text-[#666] text-sm">{selectedPersona.greeting}</p>
-                </div>
-
-                {/* Quick prompts */}
-                <div className="grid grid-cols-2 gap-2 mt-2 w-full max-w-md">
-                  {[
-                    'Explain quantum computing simply',
-                    'Help me debug my code',
-                    'Write a creative story',
-                    'Plan my week efficiently',
-                  ].map((prompt) => (
-                    <button
-                      key={prompt}
-                      onClick={() => setInput(prompt)}
-                      className="px-3 py-2.5 text-xs text-[#666] hover:text-white bg-white/3 hover:bg-white/7 rounded-xl border border-white/5 hover:border-white/15 transition-all text-left"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : (
-            /* Messages */
-            <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-              {messages.map((msg) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
-                >
-                  {/* Avatar */}
-                  <div className="flex-shrink-0 mt-1">
-                    {msg.role === 'assistant' ? (
-                      <div
-                        className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
-                        style={{ background: `${accentColor}22`, border: `1px solid ${accentColor}33` }}
-                      >
-                        {selectedPersona.avatar}
-                      </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-xl bg-white/10 overflow-hidden">
-                        {userProfile?.avatar_url ? (
-                          <Image src={userProfile.avatar_url} alt="You" width={32} height={32} className="object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">
-                            {getAvatarInitial()}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+          )}
 
-                  {/* Bubble */}
-                  <div className={`flex flex-col gap-1 max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                    {msg.role === 'assistant' && (
-                      <span className="text-[10px] text-[#444] px-1">{msg.persona || selectedPersona.name}</span>
-                    )}
-                    <div
-                      className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                        msg.role === 'user'
-                          ? 'bg-white/10 text-white rounded-tr-sm border border-white/10'
-                          : 'bg-[#161616] text-[#e0e0e0] rounded-tl-sm border border-white/5'
-                      }`}
-                    >
-                      {msg.content}
-                    </div>
-
-                    {/* Actions */}
-                    <div className={`flex items-center gap-2 px-1 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                      <span className="text-[10px] text-[#333]">{formatTime(msg.timestamp)}</span>
-                      {msg.role === 'assistant' && (
-                        <>
-                          <button
-                            onClick={() => handleCopy(msg.id, msg.content)}
-                            className="text-[#444] hover:text-[#999] transition-colors p-0.5"
-                          >
-                            {copiedId === msg.id
-                              ? <span className="text-[10px] text-green-400">Copied!</span>
-                              : <CopyIcon />}
-                          </button>
-                          <button
-                            onClick={() => handleSpeak(msg.content)}
-                            className={`transition-colors p-0.5 ${isSpeaking ? 'text-[#FF6B35]' : 'text-[#444] hover:text-[#999]'}`}
-                          >
-                            <VolumeIcon active={isSpeaking} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-
-              {/* Streaming message */}
-              {(isLoading || streamingContent) && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex gap-3"
-                >
+          {messages.map(msg => (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+            >
+              <div className="flex-shrink-0 mt-1">
+                {msg.role === 'assistant' ? (
                   <div
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 mt-1"
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
                     style={{ background: `${accentColor}22`, border: `1px solid ${accentColor}33` }}
                   >
                     {selectedPersona.avatar}
                   </div>
-                  <div className="max-w-[80%]">
-                    <span className="text-[10px] text-[#444] px-1 block mb-1">{selectedPersona.name}</span>
-                    <div className="bg-[#161616] border border-white/5 px-4 py-3 rounded-2xl rounded-tl-sm text-sm text-[#e0e0e0] leading-relaxed whitespace-pre-wrap">
-                      {streamingContent || <TypingIndicator />}
-                      {streamingContent && (
-                        <motion.span
-                          className="inline-block w-0.5 h-4 ml-0.5 align-middle"
-                          style={{ background: accentColor }}
-                          animate={{ opacity: [1, 0] }}
-                          transition={{ duration: 0.6, repeat: Infinity }}
-                        />
-                      )}
-                    </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-xl bg-white/10 overflow-hidden">
+                    {userProfile?.avatar_url ? (
+                      <Image src={userProfile.avatar_url} alt="You" width={32} height={32} className="object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">
+                        {getAvatarInitial()}
+                      </div>
+                    )}
                   </div>
-                </motion.div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-
-        {/* ── INPUT BAR ──────────────────────────────────────────── */}
-        <div className="flex-shrink-0 px-4 pb-4 pt-2">
-          <div className="max-w-3xl mx-auto">
-            <div
-              className="relative flex items-end gap-2 bg-[#161616] border border-white/10 rounded-2xl px-4 py-3 transition-all hover:border-white/15 focus-within:border-white/20"
-              style={{ boxShadow: `0 0 0 0px ${accentColor}00` }}
-            >
-              {/* Plus / upload */}
-              <div className="relative mb-0.5">
-                <button
-                  onClick={() => setShowUploadMenu(o => !o)}
-                  className="text-[#555] hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
-                >
-                  <PlusIcon />
-                </button>
-                <AnimatePresence>
-                  {showUploadMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute bottom-full left-0 mb-2 bg-[#1a1a1a] border border-white/10 rounded-xl overflow-hidden w-44 shadow-xl"
-                    >
-                      {['Upload a file', 'Recent', 'Add connector'].map((item) => (
-                        <button
-                          key={item}
-                          className="w-full text-left px-4 py-2.5 text-xs text-[#ccc] hover:bg-white/5 transition-colors"
-                          onClick={() => setShowUploadMenu(false)}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                )}
               </div>
 
-              {/* Textarea */}
+              <div className={`flex flex-col gap-1 max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                {msg.role === 'assistant' && (
+                  <span className="text-[10px] text-[#444] px-1">{msg.persona || selectedPersona.name}</span>
+                )}
+                <div
+                  className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                    msg.role === 'user'
+                      ? 'bg-white/10 text-white rounded-tr-sm border border-white/10'
+                      : 'bg-[#161616] text-[#e0e0e0] rounded-tl-sm border border-white/5'
+                  }`}
+                >
+                  {msg.content}
+                </div>
+                <div className={`flex items-center gap-2 px-1 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <span className="text-[10px] text-[#333]">{formatTime(msg.timestamp)}</span>
+                  {msg.role === 'assistant' && (
+                    <>
+                      <button onClick={() => handleCopy(msg.id, msg.content)} className="text-[#444] hover:text-[#999] transition-colors p-0.5">
+                        {copiedId === msg.id ? <span className="text-[10px] text-green-400">Copied!</span> : <CopyIcon />}
+                      </button>
+                      <button onClick={() => handleSpeak(msg.content)} className={`transition-colors p-0.5 ${isAISpeaking ? 'text-[#FF6B35]' : 'text-[#444] hover:text-[#999]'}`}>
+                        <VolumeIcon active={isAISpeaking} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+
+          {(isLoading || streamingContent) && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 mt-1"
+                style={{ background: `${accentColor}22`, border: `1px solid ${accentColor}33` }}
+              >
+                {selectedPersona.avatar}
+              </div>
+              <div className="max-w-[80%]">
+                <span className="text-[10px] text-[#444] px-1 block mb-1">{selectedPersona.name}</span>
+                <div className="bg-[#161616] border border-white/5 px-4 py-3 rounded-2xl rounded-tl-sm text-sm text-[#e0e0e0] leading-relaxed whitespace-pre-wrap">
+                  {streamingContent || <TypingIndicator color={accentColor} />}
+                  {streamingContent && (
+                    <motion.span
+                      className="inline-block w-0.5 h-4 ml-0.5 align-middle"
+                      style={{ background: accentColor }}
+                      animate={{ opacity: [1, 0] }}
+                      transition={{ duration: 0.6, repeat: Infinity }}
+                    />
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input area */}
+        <div className="px-4 py-4 border-t border-white/5 flex-shrink-0">
+          <div className="max-w-3xl mx-auto">
+            <div
+              className="flex items-end gap-2 px-4 py-3 rounded-2xl bg-[#111] border border-white/10 focus-within:border-white/20 transition-all"
+              style={{ boxShadow: `0 0 0 1px ${accentColor}00` }}
+            >
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={handleTextareaChange}
-                onKeyDown={handleKeyDown}
+                onChange={e => {
+                  setInput(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                }}
                 placeholder={`Message ${selectedPersona.name}...`}
                 rows={1}
-                className="flex-1 bg-transparent text-white placeholder-[#444] text-sm resize-none outline-none min-h-[24px] max-h-[160px] leading-6 py-0"
-                style={{ scrollbarWidth: 'none' }}
+                className="flex-1 bg-transparent text-white text-sm placeholder-[#444] resize-none outline-none leading-relaxed"
+                style={{ minHeight: '24px', maxHeight: '160px' }}
               />
-
-              {/* Right controls */}
-              <div className="flex items-center gap-1.5 mb-0.5">
-                {/* Speed/model indicator */}
-                <button className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/8 transition-all text-xs text-[#666] hover:text-white">
-                  <span>Fast</span>
-                  <ChevronIcon open={false} />
-                </button>
-
-                {/* Voice input */}
+              <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={handleVoiceInput}
-                  className={`p-1.5 rounded-lg transition-colors ${isRecording ? 'text-red-400 bg-red-400/10 animate-pulse' : 'text-[#555] hover:text-white hover:bg-white/5'}`}
+                  className="p-1.5 text-[#555] hover:text-[#999] transition-colors"
                 >
-                  <MicIcon active={isRecording} />
+                  <MicIcon />
                 </button>
-
-                {/* Waveform / send */}
                 {isLoading ? (
                   <button
                     onClick={handleStop}
-                    className="w-8 h-8 rounded-xl flex items-center justify-center bg-white text-black hover:bg-gray-200 transition-all"
+                    className="p-2 rounded-xl text-[#999] hover:text-white hover:bg-white/10 transition-all"
                   >
                     <StopIcon />
                   </button>
-                ) : input.trim() ? (
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={handleSend}
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-black transition-all"
-                    style={{ background: accentColor }}
+                ) : (
+                  <button
+                    onClick={() => handleSend()}
+                    disabled={!input.trim()}
+                    className="p-2 rounded-xl text-white transition-all disabled:opacity-30"
+                    style={{ background: input.trim() ? accentColor : 'transparent' }}
                   >
                     <SendIcon />
-                  </motion.button>
-                ) : (
-                  <button className="w-8 h-8 rounded-xl flex items-center justify-center bg-white text-black">
-                    <WaveformIcon />
                   </button>
                 )}
               </div>
             </div>
+            <p className="text-center text-[#2a2a2a] text-[10px] mt-2">
+              {selectedPersona.name} remembers your conversations · Voice mode available
+            </p>
           </div>
         </div>
       </div>
 
-      {/* ── PERSONA MODAL ────────────────────────────────────────── */}
+      {/* PERSONA MODAL */}
       <AnimatePresence>
         {showPersonaModal && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center px-4"
             onClick={() => setShowPersonaModal(false)}
           >
@@ -1127,7 +962,7 @@ export default function AIChat() {
               onClick={e => e.stopPropagation()}
             >
               <h2 className="text-white font-bold text-lg mb-1">Choose Persona</h2>
-              <p className="text-[#555] text-xs mb-5">Switch your AI's personality and communication style</p>
+              <p className="text-[#555] text-xs mb-5">Switch your AI's personality and voice</p>
               <div className="space-y-2">
                 {PERSONAS.map(persona => (
                   <motion.button
@@ -1171,14 +1006,9 @@ export default function AIChat() {
         )}
       </AnimatePresence>
 
-      {/* Click outside to close upload menu */}
-      {showUploadMenu && (
-        <div className="fixed inset-0 z-10" onClick={() => setShowUploadMenu(false)} />
-      )}
-
       <style>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );
