@@ -7,7 +7,7 @@ import FridaySidebar from '../components/friday/FridaySidebar';
 import VoiceModal from '../components/friday/VoiceModal';
 import MessageList from '../components/friday/MessageList';
 
-// ─── TYPES ───────────────────────────────────────────────────────────────────
+// ─── TYPES ───────────────────────────────────────────────────────────[...]
 
 export interface Message {
   id: string;
@@ -30,14 +30,14 @@ export interface UserProfile {
   avatar_url?: string | null;
 }
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
+// ─── HELPERS ──────────────────────────────────────────────────────────…
 
 function getUserDisplayName(profile: UserProfile | null): string {
   if (!profile) return 'there';
   return profile.name || profile.email?.split('@')[0] || 'there';
 }
 
-// ─── ICONS ────────────────────────────────────────────────────────────────────
+// ─── ICONS ───────────────────────────────────────────────────────────[...]
 
 const SendIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -60,7 +60,7 @@ const StopIcon = () => (
   </svg>
 );
 
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
+// ─── MAIN PAGE ─────────────────────────────────────────────────────────…
 
 export default function FridayPage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -81,7 +81,7 @@ export default function FridayPage() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // ─── INIT ────────────────────────────────────────────────────────────────────
+  // ─── INIT ──────────────────────────────────────────────────────────…
 
   useEffect(() => {
     loadUserProfile();
@@ -92,7 +92,7 @@ export default function FridayPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
 
-  // ─── SUPABASE ────────────────────────────────────────────────────────────────
+  // ─── SUPABASE ─────────────────────────────────────────────────────────…
 
   const loadUserProfile = async () => {
     try {
@@ -164,7 +164,7 @@ export default function FridayPage() {
   const updateMemorySummary = async (convId: string, allMessages: Message[], newContent: string) => {
     // Build rolling memory summary via API
     try {
-      const response = await fetch('https://rookieai.vercel.app/api/friday/memory', {
+      const response = await fetch('/api/friday/memory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -195,7 +195,7 @@ export default function FridayPage() {
     } catch (err) { console.error(err); }
   };
 
-  // ─── SEND ─────────────────────────────────────────────────────────────────────
+  // ─── SEND ──────────────────────────────────────────────────────────…
 
   const handleSend = useCallback(async (overrideInput?: string) => {
     const trimmed = (overrideInput ?? input).trim();
@@ -226,7 +226,7 @@ export default function FridayPage() {
 
     try {
       abortControllerRef.current = new AbortController();
-      const response = await fetch('https://rookieai.vercel.app/api/friday/chat', {
+      const response = await fetch('/api/friday/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -315,7 +315,7 @@ export default function FridayPage() {
     setIsLoading(false);
   };
 
-  // ─── TTS ─────────────────────────────────────────────────────────────────────
+  // ─── TTS ──────────────────────────────────────────────────────────…
 
   const handleSpeak = async (text: string) => {
     if (isSpeaking) {
@@ -325,7 +325,7 @@ export default function FridayPage() {
     }
     try {
       setIsSpeaking(true);
-      const response = await fetch('https://rookieai.vercel.app/api/friday/tts', {
+      const response = await fetch('/api/friday/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -347,7 +347,7 @@ export default function FridayPage() {
     await handleSend(transcript);
   };
 
-  // ─── UI ───────────────────────────────────────────────────────────────────────
+  // ─── UI ───────────────────────────────────────────────────────────[...]
 
   const handleNewChat = () => {
     setMessages([]);
