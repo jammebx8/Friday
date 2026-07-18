@@ -5,6 +5,11 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/public/src/utils/supabase';
 import { gsap } from 'gsap';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 // ── Component Imports ─────────────────────────────────────────────────────────
 import Sidebar from '../components/ai/Sidebar';
@@ -51,6 +56,26 @@ type Feedback = 'up' | 'down';
 
 // ─── PERSONAS ─────────────────────────────────────────────────────────────────
 
+
+
+const MATH_FORMATTING_INSTRUCTIONS = `
+RESPONSE FORMATTING RULES (apply to every answer, especially math, physics, chemistry, and other technical/quantitative topics):
+
+- Structure explanations the way ChatGPT does for technical answers: short intro line, then clearly separated steps using headings (## or ###) or bold step labels, then a brief closing summary of the result.
+- Use bullet points or numbered lists for multi-part explanations and derivations.
+- Define every variable the first time it's used.
+- ALL mathematical expressions, equations, and variables must be written in LaTeX — never as plain text:
+  - Inline math (a variable or short expression within a sentence): wrap in single dollar signs, e.g. $v = u + at$
+  - Display/block equations (derivations, standalone results): wrap in double dollar signs on their own line, e.g.
+    $$
+    F = ma
+    $$
+  - Use proper LaTeX commands — \\frac{}{}, \\sqrt{}, \\sum, \\int, \\Delta, \\partial, subscripts (x_1) and superscripts (x^2), Greek letters (\\alpha, \\theta), etc. Never write things like "x^2" or "sqrt(x)" outside of LaTeX delimiters.
+- For non-technical/conversational topics, formatting can stay natural and prose-like — these rules apply specifically when the content involves math, formulas, or quantitative reasoning.
+`;
+
+
+
 const PERSONAS: Persona[] = [
   {
     id: 1,
@@ -93,6 +118,7 @@ If there's a better way to solve a problem, suggest it.
 Never be rude.
 
 Keep conversations concise unless I ask for details.
+
 `,
     greeting:
       "Hey... I'm here with you. What would you like to talk about today?",
@@ -498,6 +524,9 @@ const AuroraBackground = ({ accent }: { accent: string }) => (
   </div>
 );
 
+
+
+
 // ─── TYPING INDICATOR ─────────────────────────────────────────────────────────
 
 const TypingIndicator = ({ color }: { color: string }) => (
@@ -514,6 +543,61 @@ const TypingIndicator = ({ color }: { color: string }) => (
   </div>
 );
 
+
+
+
+
+const MessageContent = ({ content }: { content: string }) => (
+  <div className="markdown-body text-[#e7e7e7] text-[15px] leading-relaxed">
+    <ReactMarkdown
+      remarkPlugins={[remarkMath, remarkGfm]}
+      rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
+      components={{
+        p: ({ ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+        h1: ({ ...props }) => <h1 className="text-lg font-semibold text-white mt-5 mb-2 first:mt-0" {...props} />,
+        h2: ({ ...props }) => <h2 className="text-base font-semibold text-white mt-4 mb-2 first:mt-0" {...props} />,
+        h3: ({ ...props }) => <h3 className="text-[15px] font-semibold text-white mt-3 mb-1.5 first:mt-0" {...props} />,
+        ul: ({ ...props }) => <ul className="list-disc pl-5 mb-3 space-y-1 last:mb-0" {...props} />,
+        ol: ({ ...props }) => <ol className="list-decimal pl-5 mb-3 space-y-1 last:mb-0" {...props} />,
+        li: ({ ...props }) => <li className="pl-1" {...props} />,
+        strong: ({ ...props }) => <strong className="text-white font-semibold" {...props} />,
+        em: ({ ...props }) => <em className="text-[#e7e7e7]" {...props} />,
+        hr: () => <hr className="border-white/10 my-4" />,
+        blockquote: ({ ...props }) => (
+          <blockquote className="border-l-2 border-white/20 pl-3 my-3 text-[#aaa] italic" {...props} />
+        ),
+        a: ({ ...props }) => (
+          <a className="underline decoration-white/30 hover:text-white" target="_blank" rel="noopener noreferrer" {...props} />
+        ),
+        code: ({ className, children, ...props }: any) => {
+          const isBlock = /language-/.test(className || '') || String(children).includes('\n');
+          if (isBlock) {
+            return (
+              <pre className="bg-[#0d0d0d] border border-white/10 rounded-xl p-3 overflow-x-auto mb-3 text-[13px]">
+                <code className={className} {...props}>{children}</code>
+              </pre>
+            );
+          }
+          return (
+            <code className="px-1.5 py-0.5 rounded-md bg-white/10 text-[13px] text-[#f0f0f0]" {...props}>
+              {children}
+            </code>
+          );
+        },
+        table: ({ ...props }) => (
+          <div className="overflow-x-auto mb-3 rounded-lg border border-white/10">
+            <table className="border-collapse w-full text-sm" {...props} />
+          </div>
+        ),
+        thead: ({ ...props }) => <thead className="bg-white/5" {...props} />,
+        th: ({ ...props }) => <th className="px-3 py-2 text-left font-semibold text-white border-b border-white/10" {...props} />,
+        td: ({ ...props }) => <td className="px-3 py-2 border-b border-white/5" {...props} />,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  </div>
+);
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function AIChat() {
@@ -788,7 +872,7 @@ export default function AIChat() {
           conversationId: convId,
           personaId: selectedPersona.id,
           personaName: selectedPersona.name,
-          personaSystemPrompt: selectedPersona.systemPrompt,
+          personaSystemPrompt: `${selectedPersona.systemPrompt}\n\n${MATH_FORMATTING_INSTRUCTIONS}`,
           history: messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
           userName: userProfile?.name || null,
         }),
@@ -1321,9 +1405,7 @@ export default function AIChat() {
                       </div>
                     ) : (
                       <>
-                        <div className="text-[#e7e7e7] text-[15px] leading-relaxed whitespace-pre-wrap">
-                          {msg.content}
-                        </div>
+                      <MessageContent content={msg.content} />
                         <div className="flex items-center gap-0.5 -ml-1.5">
                           <button
                             onClick={() => handleCopy(msg.id, msg.content)}
@@ -1373,17 +1455,19 @@ export default function AIChat() {
               {(isLoading || streamingContent) && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
                   <div className="max-w-[85%] sm:max-w-[70%]">
-                    <div className="text-[#e7e7e7] text-[15px] leading-relaxed whitespace-pre-wrap">
-                      {streamingContent || <TypingIndicator color={accentColor} />}
-                      {streamingContent && (
-                        <motion.span
-                          className="inline-block w-0.5 h-4 ml-0.5 align-middle"
-                          style={{ background: accentColor }}
-                          animate={{ opacity: [1, 0] }}
-                          transition={{ duration: 0.6, repeat: Infinity }}
-                        />
-                      )}
-                    </div>
+                  {streamingContent ? (
+  <div className="relative">
+    <MessageContent content={streamingContent} />
+    <motion.span
+      className="inline-block w-0.5 h-4 align-middle"
+      style={{ background: accentColor }}
+      animate={{ opacity: [1, 0] }}
+      transition={{ duration: 0.6, repeat: Infinity }}
+    />
+  </div>
+) : (
+  <TypingIndicator color={accentColor} />
+)}
                   </div>
                 </motion.div>
               )}
@@ -1395,44 +1479,46 @@ export default function AIChat() {
           {/* Composer stage: centered hero before the first message, docked
               to the bottom afterward. `layout` lets framer-motion animate
               the transition between the two positions. */}
-          <motion.div
-            layout
-            transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-            className={hasMessages
-              ? 'flex-shrink-0 w-full px-4 pb-6 pt-3'
-              : 'flex-1 w-full flex flex-col items-center justify-center px-4 pb-16 relative'}
+         {hasMessages ? (
+  // Docked state: just the composer, no stage wrapper, no hero content.
+  <div className="flex-shrink-0 w-full px-4 pb-6 pt-3">
+    {renderComposer()}
+  </div>
+) : (
+  // Hero state: centered greeting + aurora + composer + suggestion chips.
+  <motion.div
+    layout
+    transition={{ type: 'spring', stiffness: 300, damping: 32 }}
+    className="flex-1 w-full flex flex-col items-center justify-center px-4 pb-16 relative"
+  >
+    <AuroraBackground accent={accentColor} />
+
+    <div className="relative z-10 w-full flex flex-col items-center">
+      <div ref={logoRef} className="text-center mb-7 px-4 opacity-0">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[#555] mb-2">
+          {selectedPersona.name}
+        </p>
+        <h1 className="text-[26px] sm:text-[32px] md:text-[38px] font-semibold text-white leading-snug max-w-xl mx-auto">
+          {greeting}
+        </h1>
+      </div>
+
+      {renderComposer()}
+
+      <div className="flex gap-2 flex-wrap justify-center mt-4 max-w-2xl mx-auto">
+        {['What can you help me with?', 'Tell me about yourself', "Let's chat"].map(s => (
+          <button
+            key={s}
+            onClick={() => handleSend(s)}
+            className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[#999] hover:text-white hover:bg-white/8 text-xs transition-all"
           >
-            {!hasMessages && <AuroraBackground accent={accentColor} />}
-
-            <div className="relative z-10 w-full flex flex-col items-center">
-              {!hasMessages && (
-                <div ref={logoRef} className="text-center mb-7 px-4 opacity-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-[#555] mb-2">
-                    {selectedPersona.name}
-                  </p>
-                  <h1 className="text-[26px] sm:text-[32px] md:text-[38px] font-semibold text-white leading-snug max-w-xl mx-auto">
-                    {greeting}
-                  </h1>
-                </div>
-              )}
-
-              {renderComposer()}
-
-              {!hasMessages && (
-                <div className="flex gap-2 flex-wrap justify-center mt-4 max-w-2xl mx-auto">
-                  {['What can you help me with?', 'Tell me about yourself', "Let's chat"].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => handleSend(s)}
-                      className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[#999] hover:text-white hover:bg-white/8 text-xs transition-all"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
+  </motion.div>
+)}
         </div>
       </div>
 
@@ -1498,9 +1584,14 @@ export default function AIChat() {
       </AnimatePresence>
 
       <style>{`
-        ::-webkit-scrollbar { display: none; }
-        * { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+  ::-webkit-scrollbar { display: none; }
+  * { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* KaTeX renders black by default — bring it in line with the dark theme */
+  .markdown-body .katex { color: #e7e7e7; font-size: 1.05em; }
+  .markdown-body .katex-display { margin: 0.75rem 0; overflow-x: auto; overflow-y: hidden; }
+  .markdown-body .katex-display > .katex { text-align: left; }
+`}</style>
     </div>
   );
 }
