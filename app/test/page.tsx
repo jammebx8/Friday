@@ -1226,7 +1226,7 @@ export default function AIChat() {
               ? 'flex-shrink-0 w-full px-4 pb-6 pt-3'
               : 'flex-1 w-full flex flex-col items-center justify-center px-4 pb-16 relative'}
           >
-            {!hasMessages && <AuroraBackground accent={accentColor} />}
+            {!hasMessages && <AuroraBackground />}
 
             <div className="relative z-10 w-full flex flex-col items-center">
               {!hasMessages && (
