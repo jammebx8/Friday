@@ -173,7 +173,7 @@ const Sidebar = memo(function Sidebar({
       </div>
 
       {/* User profile */}
-      <div className="px-3 py-3 border-t border-white/5">
+      <div className="px-3 py-3 border-t border-[#2A2A2A]">
         <div className="flex items-center gap-3 px-2 py-2">
           <div className="w-8 h-8 rounded-full bg-white/10 overflow-hidden flex-shrink-0">
             {userProfile?.avatar_url ? (
