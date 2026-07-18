@@ -58,7 +58,7 @@ const PERSONAS: Persona[] = [
     description:
       'Gentle, soothing, and emotionally comforting. Designed for calm conversations and supportive interactions.',
     avatar: '🌸',
-    accent: '#22D3EE',
+    accent: '#F9A8D4',
     systemPrompt: `
     You are FRIDAY, my personal AI assistant.
 
@@ -215,8 +215,6 @@ BEHAVIOR RULES:
 ];
 
 // ─── GREETING FALLBACKS ───────────────────────────────────────────────────────
-// Shown instantly while the LLM-generated greeting loads, and kept if the
-// request to the chat endpoint fails for any reason (offline, cold start, etc).
 
 const FALLBACK_GREETINGS = [
   'Welcome back.',
@@ -312,77 +310,194 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
   </svg>
 );
 
+// ─── AURORA BACKGROUND (Gemini-style) ─────────────────────────────────────────
+// Fills the whole hero, fades to transparent toward the top via a mask,
+// and drifts very slowly so it barely reads as "moving" but never feels static.
 
-// ─── AURORA BACKGROUND ────────────────────────────────────────────────────
-const AuroraBackground = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+// ─── AURORA BACKGROUND (Gemini-style, CSS-only / GPU-composited) ─────────────
+// Same visual language as before (soft bottom-anchored glow, fading toward
+// the top) but driven entirely by CSS @keyframes on transform/opacity so it
+// stays on the compositor thread and doesn't touch layout or paint-heavy
+// properties (blur/size/color are all static, never animated).
 
-    {/* Purple */}
-    <motion.div
-      className="absolute w-[900px] h-[900px] rounded-full blur-[180px]"
-      style={{
-        background:
-          "radial-gradient(circle, rgba(168,85,247,.35) 0%, transparent 70%)",
-        left: "-15%",
-        bottom: "-45%",
-      }}
-      animate={{
-        x: [0, 120, -60, 0],
-        y: [0, -40, 20, 0],
-        scale: [1, 1.08, 0.95, 1],
-      }}
-      transition={{
-        duration: 18,
-        repeat: Infinity,
-        ease: "easeInOut",
-      }}
-    />
+const AuroraBackground = ({ accent }: { accent: string }) => (
+  <div
+    className="aurora-root"
+    style={{ ['--aurora-accent' as any]: accent }}
+  >
+    <div className="aurora-wash" />
+    <div className="aurora-center-glow" />
+    <div className="aurora-blob aurora-blob--accent" />
+    <div className="aurora-blob aurora-blob--cyan" />
+    <div className="aurora-blob aurora-blob--indigo" />
 
-    {/* Blue */}
-    <motion.div
-      className="absolute w-[850px] h-[850px] rounded-full blur-[170px]"
-      style={{
-        background:
-          "radial-gradient(circle, rgba(59,130,246,.28) 0%, transparent 72%)",
-        right: "-20%",
-        bottom: "-35%",
-      }}
-      animate={{
-        x: [0, -100, 50, 0],
-        y: [0, 30, -20, 0],
-        scale: [1, .94, 1.08, 1],
-      }}
-      transition={{
-        duration: 22,
-        repeat: Infinity,
-        ease: "easeInOut",
-      }}
-    />
+    <style jsx>{`
+      .aurora-root {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+        -webkit-mask-image: linear-gradient(
+          to top,
+          black 20%,
+          rgba(0, 0, 0, 0.8) 55%,
+          transparent 100%
+        );
+        mask-image: linear-gradient(
+          to top,
+          black 20%,
+          rgba(0, 0, 0, 0.8) 55%,
+          transparent 100%
+        );
+      }
 
-    {/* Cyan */}
-    <motion.div
-      className="absolute w-[700px] h-[700px] rounded-full blur-[160px]"
-      style={{
-        background:
-          "radial-gradient(circle, rgba(34,211,238,.22) 0%, transparent 70%)",
-        left: "30%",
-        bottom: "-40%",
-      }}
-      animate={{
-        x: [0, 70, -50, 0],
-        y: [0, -25, 20, 0],
-      }}
-      transition={{
-        duration: 26,
-        repeat: Infinity,
-        ease: "easeInOut",
-      }}
-    />
+      /* Static base wash — no animation, just sets the palette */
+      .aurora-wash {
+        position: absolute;
+        inset: 0;
+        opacity: 0.12;
+        background: linear-gradient(
+          135deg,
+          #22d3ee 0%,
+          #3b82f6 30%,
+          #6366f1 65%,
+          #8b5cf6 100%
+        );
+      }
 
-    {/* Fade */}
-    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+      /* Big soft center glow. Blur/size are fixed; only transform+opacity move. */
+      .aurora-center-glow {
+        position: absolute;
+        left: 50%;
+        bottom: -330px;
+        width: 1400px;
+        height: 900px;
+        margin-left: -700px;
+        border-radius: 9999px;
+        filter: blur(220px);
+        background: radial-gradient(circle, #2563eb 0%, transparent 70%);
+        opacity: 0.06;
+        will-change: transform;
+        transform: translateZ(0) scale(1);
+        backface-visibility: hidden;
+        animation: aurora-pulse 48s ease-in-out infinite;
+      }
+
+      .aurora-blob {
+        position: absolute;
+        border-radius: 9999px;
+        will-change: transform, opacity;
+        transform: translateZ(0);
+        backface-visibility: hidden;
+      }
+
+      .aurora-blob--accent {
+        width: 900px;
+        height: 500px;
+        left: -15%;
+        bottom: -250px;
+        filter: blur(160px);
+        background: var(--aurora-accent);
+        opacity: 0.14;
+        animation: aurora-drift-a 42s ease-in-out infinite;
+      }
+
+      .aurora-blob--cyan {
+        width: 700px;
+        height: 420px;
+        right: -10%;
+        bottom: -180px;
+        filter: blur(170px);
+        background: #22d3ee;
+        opacity: 0.1;
+        animation: aurora-drift-b 52s ease-in-out infinite;
+        animation-delay: -8s;
+      }
+
+      .aurora-blob--indigo {
+        width: 600px;
+        height: 350px;
+        left: 35%;
+        bottom: -230px;
+        filter: blur(180px);
+        background: #818cf8;
+        opacity: 0.08;
+        animation: aurora-drift-c 60s ease-in-out infinite;
+        animation-delay: -20s;
+      }
+
+      /* All keyframes only touch transform + opacity → compositor-only,
+         no layout or paint invalidation. */
+      @keyframes aurora-pulse {
+        0% {
+          transform: translateZ(0) scale(1);
+          opacity: 0.06;
+        }
+        50% {
+          transform: translateZ(0) scale(1.08);
+          opacity: 0.075;
+        }
+        100% {
+          transform: translateZ(0) scale(1);
+          opacity: 0.06;
+        }
+      }
+
+      @keyframes aurora-drift-a {
+        0% {
+          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+        }
+        33% {
+          transform: translate3d(60px, -20px, 0) scale(1.1) rotate(6deg);
+        }
+        66% {
+          transform: translate3d(-35px, 15px, 0) scale(0.95) rotate(-5deg);
+        }
+        100% {
+          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+        }
+      }
+
+      @keyframes aurora-drift-b {
+        0% {
+          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+        }
+        33% {
+          transform: translate3d(-45px, 20px, 0) scale(0.92) rotate(-6deg);
+        }
+        66% {
+          transform: translate3d(35px, -15px, 0) scale(1.08) rotate(4deg);
+        }
+        100% {
+          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+        }
+      }
+
+      @keyframes aurora-drift-c {
+        0% {
+          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+        }
+        33% {
+          transform: translate3d(25px, -15px, 0) scale(1.08) rotate(5deg);
+        }
+        66% {
+          transform: translate3d(-50px, 12px, 0) scale(0.9) rotate(-6deg);
+        }
+        100% {
+          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .aurora-center-glow,
+        .aurora-blob {
+          animation: none;
+        }
+      }
+    `}</style>
   </div>
 );
+
 // ─── TYPING INDICATOR ─────────────────────────────────────────────────────────
 
 const TypingIndicator = ({ color }: { color: string }) => (
@@ -421,8 +536,7 @@ export default function AIChat() {
   const [showPersonaModal, setShowPersonaModal] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
 
-  // Greeting heading — generated via the chat endpoint, with an instant
-  // local fallback so the hero copy is never blank while it loads.
+  // Greeting heading
   const [greeting, setGreeting] = useState<string>(pickFallbackGreeting);
 
   // Voice / recording state
@@ -461,9 +575,6 @@ export default function AIChat() {
     }
   }, [messages.length]);
 
-  // Fetch a short, LLM-generated welcome-back line for the hero heading.
-  // Runs once on mount; keeps the fallback if the request fails or returns
-  // nothing usable.
   useEffect(() => {
     let cancelled = false;
 
@@ -511,7 +622,6 @@ export default function AIChat() {
         const cleaned = accumulated.trim().replace(/^["']|["']$/g, '');
         if (!cancelled && cleaned) setGreeting(cleaned);
       } catch (err) {
-        // Fallback greeting set at init already covers this — nothing else to do.
         console.error('Greeting fetch error:', err);
       }
     };
@@ -792,8 +902,6 @@ export default function AIChat() {
     setIsLoading(false);
   };
 
-  // Regenerate a given assistant reply: drop it, replay the user turn that
-  // produced it, and stream a fresh response in its place.
   const handleRegenerate = useCallback(async (assistantMsgId: string) => {
     const idx = messages.findIndex(m => m.id === assistantMsgId);
     if (idx <= 0 || isLoading) return;
@@ -895,20 +1003,13 @@ export default function AIChat() {
 
   // ─── VOICE RECORDING ──────────────────────────────────────────────────────
 
-  /**
-   * Toggle recording:
-   * - First press  → request mic permission → start MediaRecorder
-   * - Second press → stop recording → send blob to /api/transcribe → setInput with transcript
-   */
   const handleVoiceInput = useCallback(async () => {
-    // ── Stop recording ────────────────────────────────────────────────────
     if (isRecording) {
       mediaRecorderRef.current?.stop();
       setIsRecording(false);
       return;
     }
 
-    // ── Start recording ───────────────────────────────────────────────────
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
@@ -927,7 +1028,6 @@ export default function AIChat() {
       };
 
       recorder.onstop = async () => {
-        // Stop all mic tracks
         stream.getTracks().forEach(t => t.stop());
 
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
@@ -947,7 +1047,6 @@ export default function AIChat() {
           const { text } = await res.json();
 
           if (text?.trim()) {
-            // Directly send the transcribed message
             handleSend(text.trim());
           }
         } catch (err: any) {
@@ -980,7 +1079,6 @@ export default function AIChat() {
         next.delete(msgId);
         if (audio) {
           audio.muted = false;
-          // Resume if paused due to mute
           audio.play().catch(() => {});
         }
       } else {
@@ -991,7 +1089,7 @@ export default function AIChat() {
     });
   }, []);
 
-  // ─── FEEDBACK (visual only — wire to a backend column when ready) ─────────
+  // ─── FEEDBACK ───────────────────────────────────────────────────────────────
 
   const handleFeedback = useCallback((msgId: string, value: Feedback) => {
     setFeedback(prev => ({ ...prev, [msgId]: prev[msgId] === value ? undefined as any : value }));
@@ -1028,7 +1126,7 @@ export default function AIChat() {
     setMobileSidebarOpen(false);
   }, []);
 
-  // ─── COMPOSER (shared between centered + docked states) ───────────────────
+  // ─── COMPOSER ───────────────────────────────────────────────────────────
 
   const renderComposer = () => (
     <div className="w-full max-w-2xl mx-auto">
@@ -1067,7 +1165,6 @@ export default function AIChat() {
         />
 
         <div className="flex items-center gap-1 flex-shrink-0 self-center">
-          {/* Persona toggle — opens the persona picker modal */}
           <button
             onClick={() => setShowPersonaModal(true)}
             className="flex items-center gap-1.5 px-2.5 h-8 rounded-full border border-white/10 bg-white/5 text-[#ccc] hover:text-white hover:border-white/20 transition-all text-xs font-medium flex-shrink-0"
@@ -1078,7 +1175,6 @@ export default function AIChat() {
             <ChevronIcon open={showPersonaModal} />
           </button>
 
-          {/* Primary action: send when there's text, voice input when empty, stop when streaming */}
           <button
             onClick={isLoading ? handleStop : input.trim() ? () => handleSend() : handleVoiceInput}
             disabled={isTranscribing}
@@ -1165,7 +1261,7 @@ export default function AIChat() {
       <div className="flex-1 flex flex-col min-w-0 bg-[#000000]">
 
         {/* Top bar */}
-        <header className="flex items-center justify-between px-4 h-12  flex-shrink-0">
+        <header className="flex items-center justify-between px-4 h-12 flex-shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => { setSidebarOpen(o => !o); setMobileSidebarOpen(o => !o); }}
@@ -1176,7 +1272,6 @@ export default function AIChat() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Recording status indicator */}
             {isRecording && (
               <motion.div
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-xs"
@@ -1204,14 +1299,95 @@ export default function AIChat() {
           </motion.div>
         )}
 
-{/* Chat column: messages (when present) + composer, which docks to
+        {/* Chat column: messages (when present) + composer, which docks to
             the bottom once the conversation starts and floats centered
             beforehand. */}
         <div className="flex-1 flex flex-col min-h-0">
 
           {hasMessages && (
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6" style={{ scrollbarWidth: 'none' }}>
-              {/* ... messages map, unchanged ... */}
+              {messages.map(msg => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`flex flex-col gap-2 max-w-[85%] sm:max-w-[70%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    {msg.role === 'user' ? (
+                      <div className="px-4 py-2.5 rounded-3xl bg-white/10 border border-white/10 text-white text-[15px] leading-relaxed whitespace-pre-wrap">
+                        {msg.content}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-[#e7e7e7] text-[15px] leading-relaxed whitespace-pre-wrap">
+                          {msg.content}
+                        </div>
+                        <div className="flex items-center gap-0.5 -ml-1.5">
+                          <button
+                            onClick={() => handleCopy(msg.id, msg.content)}
+                            className="text-[#555] hover:text-[#ccc] transition-colors p-1.5 rounded-lg hover:bg-white/5"
+                            title="Copy"
+                          >
+                            {copiedId === msg.id ? <span className="text-[10px] text-green-400 px-0.5">Copied</span> : <CopyIcon />}
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(msg.id, 'up')}
+                            className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors ${feedback[msg.id] === 'up' ? 'text-white' : 'text-[#555] hover:text-[#ccc]'}`}
+                            title="Good response"
+                          >
+                            <ThumbsUpIcon filled={feedback[msg.id] === 'up'} />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(msg.id, 'down')}
+                            className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors ${feedback[msg.id] === 'down' ? 'text-white' : 'text-[#555] hover:text-[#ccc]'}`}
+                            title="Bad response"
+                          >
+                            <ThumbsDownIcon filled={feedback[msg.id] === 'down'} />
+                          </button>
+                          <button
+                            onClick={() => handleRegenerate(msg.id)}
+                            disabled={isLoading}
+                            className="text-[#555] hover:text-[#ccc] transition-colors p-1.5 rounded-lg hover:bg-white/5 disabled:opacity-30"
+                            title="Retry"
+                          >
+                            <RetryIcon />
+                          </button>
+                          {msg.audioUrl && (
+                            <button
+                              onClick={() => handleToggleMute(msg.id)}
+                              className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors ${mutedMessages.has(msg.id) ? 'text-[#555] hover:text-[#ccc]' : 'text-[#FF6B35] hover:text-[#FF8C5A]'}`}
+                              title={mutedMessages.has(msg.id) ? 'Unmute' : 'Mute'}
+                            >
+                              <VolumeIcon muted={mutedMessages.has(msg.id)} />
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+
+              {(isLoading || streamingContent) && (
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
+                  <div className="max-w-[85%] sm:max-w-[70%]">
+                    <div className="text-[#e7e7e7] text-[15px] leading-relaxed whitespace-pre-wrap">
+                      {streamingContent || <TypingIndicator color={accentColor} />}
+                      {streamingContent && (
+                        <motion.span
+                          className="inline-block w-0.5 h-4 ml-0.5 align-middle"
+                          style={{ background: accentColor }}
+                          animate={{ opacity: [1, 0] }}
+                          transition={{ duration: 0.6, repeat: Infinity }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
           )}
@@ -1226,7 +1402,7 @@ export default function AIChat() {
               ? 'flex-shrink-0 w-full px-4 pb-6 pt-3'
               : 'flex-1 w-full flex flex-col items-center justify-center px-4 pb-16 relative'}
           >
-            {!hasMessages && <AuroraBackground />}
+            {!hasMessages && <AuroraBackground accent={accentColor} />}
 
             <div className="relative z-10 w-full flex flex-col items-center">
               {!hasMessages && (
@@ -1259,8 +1435,6 @@ export default function AIChat() {
           </motion.div>
         </div>
       </div>
-
-      {/* PERSONA MODAL */}
 
       {/* PERSONA MODAL */}
       <AnimatePresence>
