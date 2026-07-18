@@ -64,12 +64,14 @@ RESPONSE FORMATTING RULES (apply to every answer, especially math, physics, chem
 - Structure explanations the way ChatGPT does for technical answers: short intro line, then clearly separated steps using headings (## or ###) or bold step labels, then a brief closing summary of the result.
 - Use bullet points or numbered lists for multi-part explanations and derivations.
 - Define every variable the first time it's used.
-- ALL mathematical expressions, equations, and variables must be written in LaTeX — never as plain text:
+- ALL mathematical expressions, equations, and variables must be written in LaTeX using MARKDOWN math delimiters ONLY — never as plain text, and never inside a fenced code block (no \`\`\`latex or \`\`\`math blocks):
   - Inline math (a variable or short expression within a sentence): wrap in single dollar signs, e.g. $v = u + at$
   - Display/block equations (derivations, standalone results): wrap in double dollar signs on their own line, e.g.
     $$
     F = ma
     $$
+  - Do NOT use \\( \\) or \\[ \\] delimiters — use $ and $$ only.
+  - Do NOT put equations inside triple-backtick code blocks — write them directly in the text using $ or $$ delimiters so they render as math, not as code.
   - Use proper LaTeX commands — \\frac{}{}, \\sqrt{}, \\sum, \\int, \\Delta, \\partial, subscripts (x_1) and superscripts (x^2), Greek letters (\\alpha, \\theta), etc. Never write things like "x^2" or "sqrt(x)" outside of LaTeX delimiters.
 - For non-technical/conversational topics, formatting can stay natural and prose-like — these rules apply specifically when the content involves math, formulas, or quantitative reasoning.
 `;
@@ -547,6 +549,38 @@ const TypingIndicator = ({ color }: { color: string }) => (
 
 
 
+// ─── LATEX NORMALIZATION ────────────────────────────────────────────────────
+// remark-math only recognizes $...$ (inline) and $$...$$ (display) delimiters.
+// Models frequently ignore that and emit LaTeX-native \( \) / \[ \] delimiters,
+// or wrap equations in ```latex fenced code blocks — both of which render as
+// plain/code text instead of math. This normalizes AI output before it hits
+// ReactMarkdown so real LaTeX still renders even when the prompt isn't followed
+// exactly.
+const normalizeLatexForRendering = (raw: string): string => {
+  let text = raw;
+
+  // 1. Unwrap ```latex / ```tex / ```math fenced blocks — keep the LaTeX
+  //    content itself, drop the fence, so it's treated as text (and can then
+  //    be matched by the delimiter conversions below) instead of a code block.
+  text = text.replace(/```(?:latex|tex|math)\s*\n([\s\S]*?)```/gi, (_match, inner) => `\n${inner.trim()}\n`);
+
+  // 2. \[ ... \] → $$ ... $$ (display math)
+  text = text.replace(/\\\[([\s\S]*?)\\\]/g, (_match, inner) => `\n$$\n${inner.trim()}\n$$\n`);
+
+  // 3. \( ... \) → $ ... $ (inline math)
+  text = text.replace(/\\\(([\s\S]*?)\\\)/g, (_match, inner) => `$${inner.trim()}$`);
+
+  // 4. Bare \begin{equation}...\end{equation} (and align/gather/multline)
+  //    not already inside $$ $$ — wrap so remark-math picks it up. KaTeX
+  //    renders these natively as display math (without numbering).
+  text = text.replace(
+    /(?<!\$\$\s*)\\begin\{(equation\*?|align\*?|gather\*?|multline\*?)\}([\s\S]*?)\\end\{\1\}(?!\s*\$\$)/g,
+    (match) => `\n$$\n${match}\n$$\n`
+  );
+
+  return text;
+};
+
 const MessageContent = ({ content }: { content: string }) => (
   <div className="markdown-body text-[#e7e7e7] text-[15px] leading-relaxed">
     <ReactMarkdown
@@ -594,7 +628,7 @@ const MessageContent = ({ content }: { content: string }) => (
         td: ({ ...props }) => <td className="px-3 py-2 border-b border-white/5" {...props} />,
       }}
     >
-      {content}
+      {normalizeLatexForRendering(content)}
     </ReactMarkdown>
   </div>
 );
