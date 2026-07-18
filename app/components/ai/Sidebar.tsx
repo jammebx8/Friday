@@ -2,6 +2,10 @@
 // ─── SIDEBAR COMPONENT ───────────────────────────────────────────────────────
 // Extracted from page.tsx so chat state changes don't re-render the sidebar.
 // Uses React.memo + stable prop references to prevent unnecessary renders.
+//
+// NOTE: the persona selector used to live here. It has moved into the
+// input bar's options row (see AIChat.tsx) so it travels with the composer
+// whether it's centered on the empty state or docked at the bottom.
 
 import React, { memo } from 'react';
 import Image from 'next/image';
@@ -21,25 +25,15 @@ interface UserProfile {
   avatar_url?: string | null;
 }
 
-interface Persona {
-  id: number;
-  name: string;
-  avatar: string;
-  accent: string;
-}
-
 interface SidebarProps {
   conversations: Conversation[];
   activeConversationId: string | null;
-  selectedPersona: Persona;
   userProfile: UserProfile | null;
   historyOpen: boolean;
-  showPersonaModal: boolean;
   onNewChat: () => void;
   onLoadConversation: (id: string) => void;
   onDeleteConversation: (id: string, e: React.MouseEvent) => void;
   onToggleHistory: () => void;
-  onOpenPersonaModal: () => void;
   onCollapse: () => void;
 }
 
@@ -87,15 +81,12 @@ function formatDate(dateStr: string): string {
 const Sidebar = memo(function Sidebar({
   conversations,
   activeConversationId,
-  selectedPersona,
   userProfile,
   historyOpen,
-  showPersonaModal,
   onNewChat,
   onLoadConversation,
   onDeleteConversation,
   onToggleHistory,
-  onOpenPersonaModal,
   onCollapse,
 }: SidebarProps) {
   const getUserDisplayName = () =>
@@ -104,7 +95,7 @@ const Sidebar = memo(function Sidebar({
     (userProfile?.name?.[0] || userProfile?.email?.[0] || 'U').toUpperCase();
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full font-['Inter',sans-serif]">
       {/* Logo & collapse */}
       <div className="flex items-center justify-between px-4 pb-4 pt-2">
         <img src="/fridaylogo.jpg" alt="Friday Logo" className="w-32 h-auto object-contain" />
@@ -121,26 +112,6 @@ const Sidebar = memo(function Sidebar({
         >
           <PlusIcon />
           <span>New Chat</span>
-        </button>
-      </div>
-
-      {/* Persona selector */}
-      <div className="px-3 pb-3">
-        <button
-          onClick={onOpenPersonaModal}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-all border border-white/10"
-        >
-          <div
-            className="w-8 h-8 rounded-lg text-lg flex items-center justify-center"
-            style={{ background: `${selectedPersona.accent}22` }}
-          >
-            {selectedPersona.avatar}
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-white text-xs font-semibold">{selectedPersona.name}</p>
-            <p className="text-[#555] text-[10px]">Active persona</p>
-          </div>
-          <ChevronIcon open={showPersonaModal} />
         </button>
       </div>
 

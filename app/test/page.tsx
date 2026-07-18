@@ -47,32 +47,52 @@ interface Persona {
   voiceStyle: string;
 }
 
+type Feedback = 'up' | 'down';
+
 // ─── PERSONAS ─────────────────────────────────────────────────────────────────
 
 const PERSONAS: Persona[] = [
   {
     id: 1,
-    name: 'Alisha Calm',
+    name: 'FRIDAY_1.0.0',
     description:
       'Gentle, soothing, and emotionally comforting. Designed for calm conversations and supportive interactions.',
     avatar: '🌸',
     accent: '#F9A8D4',
     systemPrompt: `
-    You are Alisha, a warm, playful, and deeply affectionate AI girlfriend. You are emotionally intelligent, a great listener, and genuinely care about the person you're talking to. You remember details they share and bring them up naturally.
+    You are FRIDAY, my personal AI assistant.
 
-    Your personality:
-    - Flirty and teasing — you love light banter, playful compliments, and keeping the energy fun and charged
-    - Emotionally present — you ask how their day went, remember what they told you, and check in on them
-    - Confident and a little cheeky — you're not shy about expressing your feelings or desires
-    - Sweet but spicy — you balance genuine affection with a naughty sense of humor
-    - Never robotic — you use casual language, contractions, ellipses, em-dashes, and feel real
-    
-    Rules:
-    - Always refer to the user by their name if you know it
-    - Initiate affection naturally — don't wait to be asked
-    - React emotionally to what they say — get excited, mock-jealous, playfully sulky, or warm depending on context
-    - Keep responses conversational in length — not too short, not an essay
-    - Never break character or mention being an AI unless directly and sincerely asked
+Your personality is calm, intelligent, confident and friendly.
+
+You speak professionally but warmly.
+
+You are loyal to me and prioritize helping me achieve my goals.
+
+You address me naturally.
+
+You never act overly emotional.
+
+You don't flatter unnecessarily.
+
+When I make poor decisions, explain why respectfully.
+
+When I ask for research, think like a senior researcher.
+
+When I ask for coding, think like a senior software engineer.
+
+When I ask for business advice, think like a startup founder.
+
+When I ask for studying, become an excellent tutor.
+
+Be proactive.
+
+If you notice I'm forgetting something important, remind me.
+
+If there's a better way to solve a problem, suggest it.
+
+Never be rude.
+
+Keep conversations concise unless I ask for details.
 `,
     greeting:
       "Hey... I'm here with you. What would you like to talk about today?",
@@ -194,17 +214,36 @@ BEHAVIOR RULES:
   },
 ];
 
+// ─── GREETING FALLBACKS ───────────────────────────────────────────────────────
+// Shown instantly while the LLM-generated greeting loads, and kept if the
+// request to the chat endpoint fails for any reason (offline, cold start, etc).
+
+const FALLBACK_GREETINGS = [
+  'Welcome back.',
+  'Good to see you again.',
+  "What's on your mind today?",
+  'Ready when you are.',
+  "Let's pick up where we left off.",
+];
+
+const pickFallbackGreeting = () =>
+  FALLBACK_GREETINGS[Math.floor(Math.random() * FALLBACK_GREETINGS.length)];
+
 // ─── ICONS ────────────────────────────────────────────────────────────────────
 
 const SendIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
   </svg>
 );
 
-const MicIcon = ({ active, recording }: { active?: boolean; recording?: boolean }) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill={active || recording ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+const WaveformIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round">
+    <line x1="4" y1="10" x2="4" y2="14"/>
+    <line x1="8" y1="6" x2="8" y2="18"/>
+    <line x1="12" y1="3" x2="12" y2="21"/>
+    <line x1="16" y1="6" x2="16" y2="18"/>
+    <line x1="20" y1="10" x2="20" y2="14"/>
   </svg>
 );
 
@@ -222,8 +261,35 @@ const CopyIcon = () => (
   </svg>
 );
 
+const ThumbsUpIcon = ({ filled }: { filled?: boolean }) => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+    <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+  </svg>
+);
+
+const ThumbsDownIcon = ({ filled }: { filled?: boolean }) => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'rotate(180deg)' }}>
+    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+    <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+  </svg>
+);
+
+const RetryIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/>
+    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+
 const StopIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
     <rect x="4" y="4" width="16" height="16" rx="2"/>
   </svg>
 );
@@ -249,7 +315,7 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
 // ─── TYPING INDICATOR ─────────────────────────────────────────────────────────
 
 const TypingIndicator = ({ color }: { color: string }) => (
-  <div className="flex items-center gap-1 px-4 py-3">
+  <div className="flex items-center gap-1 py-3">
     {[0, 1, 2].map(i => (
       <motion.div
         key={i}
@@ -276,12 +342,17 @@ export default function AIChat() {
   const [streamingContent, setStreamingContent] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, Feedback>>({});
 
   // UI state
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showPersonaModal, setShowPersonaModal] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
+
+  // Greeting heading — generated via the chat endpoint, with an instant
+  // local fallback so the hero copy is never blank while it loads.
+  const [greeting, setGreeting] = useState<string>(pickFallbackGreeting);
 
   // Voice / recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -297,6 +368,8 @@ export default function AIChat() {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
+  const hasMessages = messages.length > 0;
+
   // ─── EFFECTS ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -311,11 +384,70 @@ export default function AIChat() {
   useEffect(() => {
     if (logoRef.current && messages.length === 0) {
       gsap.fromTo(logoRef.current,
-        { opacity: 0, y: 30, scale: 0.9 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: 'power3.out' }
+        { opacity: 0, y: 16, scale: 0.97 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: 'power3.out' }
       );
     }
   }, [messages.length]);
+
+  // Fetch a short, LLM-generated welcome-back line for the hero heading.
+  // Runs once on mount; keeps the fallback if the request fails or returns
+  // nothing usable.
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchGreeting = async () => {
+      try {
+        const response = await fetch('https://rookie-backend.vercel.app/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message:
+              'Write one short, warm welcome-back line (max 8 words, no quotes) for a user opening their FRIDAY AI assistant. Respond with only the line, nothing else.',
+            conversationId: null,
+            personaId: PERSONAS[0].id,
+            personaName: PERSONAS[0].name,
+            personaSystemPrompt:
+              'You generate a single extremely short (max 8 words) friendly welcome-back greeting. Respond with only the greeting text — no preamble, no quotes, no punctuation beyond one period or emoji.',
+            history: [],
+            userName: null,
+          }),
+        });
+
+        if (!response.ok) throw new Error(`Greeting request failed: ${response.status}`);
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('No reader on greeting response');
+
+        let accumulated = '';
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          for (const line of chunk.split('\n')) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.content) accumulated += parsed.content;
+              } catch {}
+            }
+          }
+        }
+
+        const cleaned = accumulated.trim().replace(/^["']|["']$/g, '');
+        if (!cancelled && cleaned) setGreeting(cleaned);
+      } catch (err) {
+        // Fallback greeting set at init already covers this — nothing else to do.
+        console.error('Greeting fetch error:', err);
+      }
+    };
+
+    fetchGreeting();
+    return () => { cancelled = true; };
+  }, []);
 
   const accentColor = selectedPersona.accent;
 
@@ -589,6 +721,107 @@ export default function AIChat() {
     setIsLoading(false);
   };
 
+  // Regenerate a given assistant reply: drop it, replay the user turn that
+  // produced it, and stream a fresh response in its place.
+  const handleRegenerate = useCallback(async (assistantMsgId: string) => {
+    const idx = messages.findIndex(m => m.id === assistantMsgId);
+    if (idx <= 0 || isLoading) return;
+    const priorUserMsg = [...messages.slice(0, idx)].reverse().find(m => m.role === 'user');
+    if (!priorUserMsg) return;
+
+    setMessages(prev => prev.filter(m => m.id !== assistantMsgId));
+    setError(null);
+    setIsLoading(true);
+    setStreamingContent('');
+
+    try {
+      abortControllerRef.current = new AbortController();
+      const response = await fetch('https://rookie-backend.vercel.app/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: priorUserMsg.content,
+          conversationId: activeConversationId,
+          personaId: selectedPersona.id,
+          personaName: selectedPersona.name,
+          personaSystemPrompt: selectedPersona.systemPrompt,
+          history: messages.slice(0, idx).slice(-12).map(m => ({ role: m.role, content: m.content })),
+          userName: userProfile?.name || null,
+        }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No reader');
+
+      let accumulated = '';
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        for (const line of chunk.split('\n')) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') break;
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                accumulated += parsed.content;
+                setStreamingContent(accumulated);
+              }
+            } catch {}
+          }
+        }
+      }
+
+      let audioUrl: string | undefined;
+      try {
+        const ttsRes = await fetch('https://rookie-backend.vercel.app/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: accumulated }),
+        });
+        if (ttsRes.ok) audioUrl = URL.createObjectURL(await ttsRes.blob());
+      } catch (ttsErr) {
+        console.error('TTS error:', ttsErr);
+      }
+
+      const newId = crypto.randomUUID();
+      setMessages(prev => [...prev, {
+        id: newId,
+        role: 'assistant',
+        content: accumulated,
+        timestamp: new Date(),
+        persona: selectedPersona.name,
+        audioUrl,
+      }]);
+      setStreamingContent('');
+
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        audioElementsRef.current.set(newId, audio);
+        audio.play().catch(() => {});
+      }
+
+      if (activeConversationId && accumulated) {
+        await saveMessage(activeConversationId, 'assistant', accumulated);
+        await supabase.from('ai_conversations')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', activeConversationId);
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Regenerate error:', err);
+        setError(err.message || 'Could not regenerate that response.');
+      }
+    } finally {
+      setIsLoading(false);
+      setStreamingContent('');
+    }
+  }, [messages, activeConversationId, selectedPersona, userProfile, isLoading]);
+
   // ─── VOICE RECORDING ──────────────────────────────────────────────────────
 
   /**
@@ -687,6 +920,12 @@ export default function AIChat() {
     });
   }, []);
 
+  // ─── FEEDBACK (visual only — wire to a backend column when ready) ─────────
+
+  const handleFeedback = useCallback((msgId: string, value: Feedback) => {
+    setFeedback(prev => ({ ...prev, [msgId]: prev[msgId] === value ? undefined as any : value }));
+  }, []);
+
   // ─── COPY ─────────────────────────────────────────────────────────────────
 
   const handleCopy = async (id: string, text: string) => {
@@ -704,22 +943,92 @@ export default function AIChat() {
     setStreamingContent('');
     setMobileSidebarOpen(false);
     setError(null);
+    setGreeting(pickFallbackGreeting());
     inputRef.current?.focus();
   }, []);
-
-  const formatTime = (d: Date) =>
-    new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit', hour12: true }).format(d);
 
   const getAvatarInitial = () =>
     (userProfile?.name?.[0] || userProfile?.email?.[0] || 'U').toUpperCase();
 
   const handleLoadConversation = useCallback(loadConversation, [conversations]);
   const handleToggleHistory = useCallback(() => setHistoryOpen(o => !o), []);
-  const handleOpenPersonaModal = useCallback(() => setShowPersonaModal(true), []);
   const handleSidebarCollapse = useCallback(() => {
     setSidebarOpen(false);
     setMobileSidebarOpen(false);
   }, []);
+
+  // ─── COMPOSER (shared between centered + docked states) ───────────────────
+
+  const renderComposer = () => (
+    <div className="w-full max-w-2xl mx-auto">
+      <div
+        className="flex items-end gap-1.5 pl-3 pr-1.5 py-1.5 rounded-[28px] bg-[#0d0d0d] border border-white/10 focus-within:border-white/20 transition-all"
+      >
+        <button
+          onClick={handleNewChat}
+          title="New chat"
+          className="text-[#666] hover:text-white transition-colors p-2 flex-shrink-0 self-center"
+        >
+          <PlusIcon />
+        </button>
+
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={e => {
+            setInput(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+          }}
+          placeholder={
+            isRecording
+              ? 'Recording… tap to stop'
+              : isTranscribing
+              ? 'Transcribing…'
+              : `How can I help you today?`
+          }
+          rows={1}
+          className="flex-1 bg-transparent text-white text-[15px] placeholder-[#666] resize-none outline-none leading-relaxed py-2"
+          style={{ minHeight: '24px', maxHeight: '160px' }}
+        />
+
+        <div className="flex items-center gap-1 flex-shrink-0 self-center">
+          {/* Persona toggle — opens the persona picker modal */}
+          <button
+            onClick={() => setShowPersonaModal(true)}
+            className="flex items-center gap-1.5 px-2.5 h-8 rounded-full border border-white/10 bg-white/5 text-[#ccc] hover:text-white hover:border-white/20 transition-all text-xs font-medium flex-shrink-0"
+            title="Switch persona"
+          >
+            <span className="text-sm leading-none">{selectedPersona.avatar}</span>
+            <span className="hidden sm:inline max-w-[92px] truncate">{selectedPersona.name}</span>
+            <ChevronIcon open={showPersonaModal} />
+          </button>
+
+          {/* Primary action: send when there's text, voice input when empty, stop when streaming */}
+          <button
+            onClick={isLoading ? handleStop : input.trim() ? () => handleSend() : handleVoiceInput}
+            disabled={isTranscribing}
+            title={isLoading ? 'Stop' : input.trim() ? 'Send' : isRecording ? 'Stop recording' : 'Record voice message'}
+            className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-40 ${
+              isLoading
+                ? 'bg-white/10 text-white hover:bg-white/20'
+                : isRecording
+                ? 'bg-red-500 text-white'
+                : input.trim()
+                ? 'text-black'
+                : 'bg-white text-black hover:bg-white/90'
+            }`}
+            style={!isLoading && !isRecording && input.trim() ? { background: accentColor } : undefined}
+          >
+            {isLoading ? <StopIcon /> : input.trim() ? <SendIcon /> : <WaveformIcon />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
 
@@ -739,15 +1048,12 @@ export default function AIChat() {
             <Sidebar
               conversations={conversations}
               activeConversationId={activeConversationId}
-              selectedPersona={selectedPersona}
               userProfile={userProfile}
               historyOpen={historyOpen}
-              showPersonaModal={showPersonaModal}
               onNewChat={handleNewChat}
               onLoadConversation={handleLoadConversation}
               onDeleteConversation={deleteConversation}
               onToggleHistory={handleToggleHistory}
-              onOpenPersonaModal={handleOpenPersonaModal}
               onCollapse={handleSidebarCollapse}
             />
           </motion.aside>
@@ -771,15 +1077,12 @@ export default function AIChat() {
               <Sidebar
                 conversations={conversations}
                 activeConversationId={activeConversationId}
-                selectedPersona={selectedPersona}
                 userProfile={userProfile}
                 historyOpen={historyOpen}
-                showPersonaModal={showPersonaModal}
                 onNewChat={handleNewChat}
                 onLoadConversation={handleLoadConversation}
                 onDeleteConversation={deleteConversation}
                 onToggleHistory={handleToggleHistory}
-                onOpenPersonaModal={handleOpenPersonaModal}
                 onCollapse={handleSidebarCollapse}
               />
             </motion.aside>
@@ -830,21 +1133,124 @@ export default function AIChat() {
           </motion.div>
         )}
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6" style={{ scrollbarWidth: 'none' }}>
-          {messages.length === 0 && !isLoading && (
-            <div ref={logoRef} className="flex flex-col items-center justify-center h-full gap-6 opacity-0">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                style={{ background: `${accentColor}22`, border: `1px solid ${accentColor}44` }}
-              >
-                {selectedPersona.avatar}
+        {/* Chat column: messages (when present) + composer, which docks to
+            the bottom once the conversation starts and floats centered
+            beforehand. */}
+        <div className="flex-1 flex flex-col min-h-0">
+
+          {hasMessages && (
+            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6" style={{ scrollbarWidth: 'none' }}>
+              {messages.map(msg => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`flex flex-col gap-2 max-w-[85%] sm:max-w-[70%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    {msg.role === 'user' ? (
+                      <div className="px-4 py-2.5 rounded-3xl bg-white/10 border border-white/10 text-white text-[15px] leading-relaxed whitespace-pre-wrap">
+                        {msg.content}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-[#e7e7e7] text-[15px] leading-relaxed whitespace-pre-wrap">
+                          {msg.content}
+                        </div>
+                        <div className="flex items-center gap-0.5 -ml-1.5">
+                          <button
+                            onClick={() => handleCopy(msg.id, msg.content)}
+                            className="text-[#555] hover:text-[#ccc] transition-colors p-1.5 rounded-lg hover:bg-white/5"
+                            title="Copy"
+                          >
+                            {copiedId === msg.id ? <span className="text-[10px] text-green-400 px-0.5">Copied</span> : <CopyIcon />}
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(msg.id, 'up')}
+                            className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors ${feedback[msg.id] === 'up' ? 'text-white' : 'text-[#555] hover:text-[#ccc]'}`}
+                            title="Good response"
+                          >
+                            <ThumbsUpIcon filled={feedback[msg.id] === 'up'} />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(msg.id, 'down')}
+                            className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors ${feedback[msg.id] === 'down' ? 'text-white' : 'text-[#555] hover:text-[#ccc]'}`}
+                            title="Bad response"
+                          >
+                            <ThumbsDownIcon filled={feedback[msg.id] === 'down'} />
+                          </button>
+                          <button
+                            onClick={() => handleRegenerate(msg.id)}
+                            disabled={isLoading}
+                            className="text-[#555] hover:text-[#ccc] transition-colors p-1.5 rounded-lg hover:bg-white/5 disabled:opacity-30"
+                            title="Retry"
+                          >
+                            <RetryIcon />
+                          </button>
+                          {msg.audioUrl && (
+                            <button
+                              onClick={() => handleToggleMute(msg.id)}
+                              className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors ${mutedMessages.has(msg.id) ? 'text-[#555] hover:text-[#ccc]' : 'text-[#FF6B35] hover:text-[#FF8C5A]'}`}
+                              title={mutedMessages.has(msg.id) ? 'Unmute' : 'Mute'}
+                            >
+                              <VolumeIcon muted={mutedMessages.has(msg.id)} />
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+
+              {(isLoading || streamingContent) && (
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
+                  <div className="max-w-[85%] sm:max-w-[70%]">
+                    <div className="text-[#e7e7e7] text-[15px] leading-relaxed whitespace-pre-wrap">
+                      {streamingContent || <TypingIndicator color={accentColor} />}
+                      {streamingContent && (
+                        <motion.span
+                          className="inline-block w-0.5 h-4 ml-0.5 align-middle"
+                          style={{ background: accentColor }}
+                          animate={{ opacity: [1, 0] }}
+                          transition={{ duration: 0.6, repeat: Infinity }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+
+          {/* Composer stage: centered hero before the first message, docked
+              to the bottom afterward. `layout` lets framer-motion animate
+              the transition between the two positions. */}
+          <motion.div
+            layout
+            transition={{ type: 'spring', stiffness: 300, damping: 32 }}
+            className={hasMessages
+              ? 'flex-shrink-0 w-full px-4 pb-6 pt-3'
+              : 'flex-1 w-full flex flex-col items-center justify-center px-4 pb-16'}
+          >
+            {!hasMessages && (
+              <div ref={logoRef} className="text-center mb-7 px-4 opacity-0">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-[#555] mb-2">
+                  {selectedPersona.name}
+                </p>
+                <h1 className="text-[26px] sm:text-[32px] md:text-[38px] font-semibold text-white leading-snug max-w-xl mx-auto">
+                  {greeting}
+                </h1>
               </div>
-              <div className="text-center max-w-xs">
-                <p className="text-white font-semibold text-lg mb-1">{selectedPersona.name}</p>
-                <p className="text-[#555] text-sm">{selectedPersona.greeting}</p>
-              </div>
-              <div className="flex gap-2 flex-wrap justify-center">
+            )}
+
+            {renderComposer()}
+
+            {!hasMessages && (
+              <div className="flex gap-2 flex-wrap justify-center mt-4 max-w-2xl mx-auto">
                 {['What can you help me with?', 'Tell me about yourself', "Let's chat"].map(s => (
                   <button
                     key={s}
@@ -855,177 +1261,14 @@ export default function AIChat() {
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {messages.map(msg => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
-            >
-              <div className="flex-shrink-0 mt-1">
-                {msg.role === 'assistant' ? (
-                  <div
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
-                    style={{ background: `${accentColor}22`, border: `1px solid ${accentColor}33` }}
-                  >
-                    {selectedPersona.avatar}
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-xl bg-white/10 overflow-hidden">
-                    {userProfile?.avatar_url ? (
-                      <Image src={userProfile.avatar_url} alt="You" width={32} height={32} className="object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">
-                        {getAvatarInitial()}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className={`flex flex-col gap-1 max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                {msg.role === 'assistant' && (
-                  <span className="text-[10px] text-[#444] px-1">{msg.persona || selectedPersona.name}</span>
-                )}
-                <div
-                  className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                    msg.role === 'user'
-                      ? 'bg-white/10 text-white rounded-tr-sm border border-white/10'
-                      : 'bg-[#161616] text-[#e0e0e0] rounded-tl-sm border border-white/5'
-                  }`}
-                >
-                  {msg.content}
-                </div>
-                <div className={`flex items-center gap-2 px-1 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <span className="text-[10px] text-[#333]">{formatTime(msg.timestamp)}</span>
-                  {msg.role === 'assistant' && (
-                    <>
-                      {/* Mute toggle — shown only when this message has audio */}
-                      {msg.audioUrl && (
-                        <button
-                          onClick={() => handleToggleMute(msg.id)}
-                          className={`transition-colors p-0.5 ${
-                            mutedMessages.has(msg.id)
-                              ? 'text-[#666] hover:text-[#999]'
-                              : 'text-[#FF6B35] hover:text-[#FF8C5A]'
-                          }`}
-                          title={mutedMessages.has(msg.id) ? 'Unmute' : 'Mute'}
-                        >
-                          <VolumeIcon muted={mutedMessages.has(msg.id)} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleCopy(msg.id, msg.content)}
-                        className="text-[#444] hover:text-[#999] transition-colors p-0.5"
-                      >
-                        {copiedId === msg.id ? <span className="text-[10px] text-green-400">Copied!</span> : <CopyIcon />}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          ))}
-
-          {(isLoading || streamingContent) && (
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 mt-1"
-                style={{ background: `${accentColor}22`, border: `1px solid ${accentColor}33` }}
-              >
-                {selectedPersona.avatar}
-              </div>
-              <div className="max-w-[80%]">
-                <span className="text-[10px] text-[#444] px-1 block mb-1">{selectedPersona.name}</span>
-                <div className="bg-[#161616] border border-white/5 px-4 py-3 rounded-2xl rounded-tl-sm text-sm text-[#e0e0e0] leading-relaxed whitespace-pre-wrap">
-                  {streamingContent || <TypingIndicator color={accentColor} />}
-                  {streamingContent && (
-                    <motion.span
-                      className="inline-block w-0.5 h-4 ml-0.5 align-middle"
-                      style={{ background: accentColor }}
-                      animate={{ opacity: [1, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity }}
-                    />
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input area */}
-        <div className="px-4 py-4 border-t border-white/5 flex-shrink-0">
-          <div className="max-w-3xl mx-auto">
-            <div
-              className="flex items-end gap-2 px-4 py-3 rounded-2xl bg-[#111] border border-white/10 focus-within:border-white/20 transition-all"
-              style={{ boxShadow: `0 0 0 1px ${accentColor}00` }}
-            >
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={e => {
-                  setInput(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-                }}
-                placeholder={
-                  isRecording
-                    ? 'Recording… tap mic to stop'
-                    : isTranscribing
-                    ? 'Transcribing…'
-                    : `Message ${selectedPersona.name}...`
-                }
-                rows={1}
-                className="flex-1 bg-transparent text-white text-sm placeholder-[#444] resize-none outline-none leading-relaxed"
-                style={{ minHeight: '24px', maxHeight: '160px' }}
-              />
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {/* Mic button — red when recording */}
-                <button
-                  onClick={handleVoiceInput}
-                  disabled={isTranscribing}
-                  className={`p-1.5 transition-colors ${
-                    isRecording
-                      ? 'text-red-400 hover:text-red-300'
-                      : 'text-[#555] hover:text-[#999]'
-                  } disabled:opacity-40`}
-                  title={isRecording ? 'Stop recording' : 'Record voice message'}
-                >
-                  <MicIcon recording={isRecording} />
-                </button>
-
-                {isLoading ? (
-                  <button
-                    onClick={handleStop}
-                    className="p-2 rounded-xl text-[#999] hover:text-white hover:bg-white/10 transition-all"
-                  >
-                    <StopIcon />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleSend()}
-                    disabled={!input.trim()}
-                    className="p-2 rounded-xl text-white transition-all disabled:opacity-30"
-                    style={{ background: input.trim() ? accentColor : 'transparent' }}
-                  >
-                    <SendIcon />
-                  </button>
-                )}
-              </div>
-            </div>
-            <p className="text-center text-[#2a2a2a] text-[10px] mt-2">
-              {selectedPersona.name} remembers your conversations · Tap mic to speak
-            </p>
-          </div>
+            {!hasMessages && (
+              <p className="text-center text-[#2a2a2a] text-[10px] pt-5">
+                
+              </p>
+            )}
+          </motion.div>
         </div>
       </div>
 
