@@ -10,6 +10,8 @@ import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 // ── Component Imports ─────────────────────────────────────────────────────────
 import Sidebar from '../../app/components/ai/Sidebar';
@@ -530,6 +532,61 @@ const normalizeLatexForRendering = (raw: string): string => {
   return text;
 };
 
+// ─── CODE BLOCK (syntax highlighted + copy button) ─────────────────────────
+
+const CodeCheckIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+
+const CodeBlock = ({ className, children }: { className?: string; children: React.ReactNode }) => {
+  const [copied, setCopied] = useState(false);
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match ? match[1] : 'text';
+  const codeString = String(children).replace(/\n$/, '');
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(codeString);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  };
+
+  return (
+    <div className="my-3 rounded-2xl overflow-hidden border border-white/10 bg-[#0d0d0d]">
+      <div className="flex items-center justify-between px-3.5 py-2 bg-[#161616] border-b border-white/10">
+        <span className="text-[11.5px] font-medium text-[#888] lowercase tracking-wide">{language}</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 text-[#999] hover:text-white transition-colors text-[12px] font-medium px-1.5 py-1 rounded-md hover:bg-white/5"
+        >
+          {copied ? <CodeCheckIcon /> : <CopyIcon />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <SyntaxHighlighter
+        language={language}
+        style={oneDark}
+        customStyle={{
+          margin: 0,
+          background: 'transparent',
+          padding: '14px',
+          fontSize: '13px',
+          lineHeight: 1.6,
+        }}
+        codeTagProps={{ style: { fontFamily: "'JetBrains Mono', 'Fira Code', monospace" } }}
+        wrapLongLines={false}
+      >
+        {codeString}
+      </SyntaxHighlighter>
+    </div>
+  );
+};
+
 const MessageContent = ({ content }: { content: string }) => (
   <div className="markdown-body text-[#e7e7e7] text-[15px] leading-relaxed">
     <ReactMarkdown
@@ -555,11 +612,7 @@ const MessageContent = ({ content }: { content: string }) => (
         code: ({ className, children, ...props }: any) => {
           const isBlock = /language-/.test(className || '') || String(children).includes('\n');
           if (isBlock) {
-            return (
-              <pre className="bg-[#0d0d0d] border border-white/10 rounded-xl p-3 overflow-x-auto mb-3 text-[13px]">
-                <code className={className} {...props}>{children}</code>
-              </pre>
-            );
+            return <CodeBlock className={className}>{children}</CodeBlock>;
           }
           return (
             <code className="px-1.5 py-0.5 rounded-md bg-white/10 text-[13px] text-[#f0f0f0]" {...props}>
@@ -567,6 +620,9 @@ const MessageContent = ({ content }: { content: string }) => (
             </code>
           );
         },
+        // CodeBlock already renders its own wrapping <div>; skip the default
+        // <pre> so we don't end up with a <div> nested inside a <pre>.
+        pre: ({ children }: any) => <>{children}</>,
         table: ({ ...props }) => (
           <div className="overflow-x-auto mb-3 rounded-lg border border-white/10">
             <table className="border-collapse w-full text-sm" {...props} />
@@ -1377,7 +1433,7 @@ export default function AIChat() {
         <div className="flex-1 flex flex-col min-h-0">
 
           {hasMessages && (
-            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6" style={{ scrollbarWidth: 'none' }}>
+            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-6" style={{ scrollbarWidth: 'none' }}>
               {messages.map(msg => (
                 <motion.div
                   key={msg.id}
@@ -1470,8 +1526,8 @@ export default function AIChat() {
          {hasMessages ? (
   // Docked state: just the composer, no stage wrapper, no hero content.
   <div
-    className="flex-shrink-0 w-full px-4 pt-3"
-    style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+    className="flex-shrink-0 w-full px-4 pt-1.5"
+    style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
   >
     {renderComposer()}
   </div>
