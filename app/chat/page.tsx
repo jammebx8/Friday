@@ -1254,7 +1254,7 @@ export default function AIChat() {
   // ─── RENDER ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen bg-[#000000] text-white overflow-hidden font-['Inter',sans-serif]">
+    <div className="flex h-screen h-[100dvh] bg-[#000000] text-white overflow-hidden font-['Inter',sans-serif]">
 
       {/* DESKTOP SIDEBAR */}
       <AnimatePresence>
@@ -1300,6 +1300,10 @@ export default function AIChat() {
               initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="md:hidden fixed left-0 top-0 bottom-0 w-[260px] bg-[#000000] border-r border-[#2A2A2A] z-50"
+              style={{
+                paddingTop: 'env(safe-area-inset-top)',
+                paddingBottom: 'env(safe-area-inset-bottom)',
+              }}
             >
               <Sidebar
                 conversations={conversations}
@@ -1325,7 +1329,10 @@ export default function AIChat() {
       <div className="flex-1 flex flex-col min-w-0 bg-[#000000]">
 
         {/* Top bar */}
-        <header className="flex items-center justify-between px-4 h-12 flex-shrink-0">
+        <header
+          className="flex items-center justify-between px-4 h-12 flex-shrink-0"
+          style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(3rem + env(safe-area-inset-top))' }}
+        >
           <div className="flex items-center gap-3">
             <button
               onClick={handleToggleSidebar}
@@ -1462,7 +1469,10 @@ export default function AIChat() {
               the transition between the two positions. */}
          {hasMessages ? (
   // Docked state: just the composer, no stage wrapper, no hero content.
-  <div className="flex-shrink-0 w-full px-4 pb-6 pt-3">
+  <div
+    className="flex-shrink-0 w-full px-4 pt-3"
+    style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+  >
     {renderComposer()}
   </div>
 ) : (
@@ -1470,7 +1480,8 @@ export default function AIChat() {
   <motion.div
     layout
     transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-    className="flex-1 w-full flex flex-col items-center justify-center px-4 pb-16 relative"
+    className="flex-1 w-full flex flex-col items-center justify-center px-4 relative"
+    style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
   >
     <AuroraBackground accent={accentColor} />
 
