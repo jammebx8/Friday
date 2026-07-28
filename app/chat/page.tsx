@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '@/public/src/utils/supabase';
+import { supabase } from '../../utils/supabase/client';
 import { gsap } from 'gsap';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
