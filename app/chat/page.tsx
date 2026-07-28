@@ -30,6 +30,7 @@ interface Conversation {
   title: string;
   updated_at: string;
   persona_id: number;
+  pinned?: boolean;
 }
 
 interface UserProfile {
@@ -350,15 +351,15 @@ const StopIcon = () => (
   </svg>
 );
 
-const MenuIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-  </svg>
-);
-
-const CollapseIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="15 18 9 12 15 6"/>
+// Single toggle button for the sidebar drawer (desktop + mobile). Shows a
+// "close drawer" double-chevron when the sidebar is open, and the mirrored
+// "open drawer" double-chevron when it's closed — so there's only one
+// control for opening/closing the sidebar, living in the page header.
+const SidebarToggleIcon = ({ open }: { open: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    style={{ transform: open ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s' }}>
+    <polyline points="11 17 6 12 11 7"/>
+    <polyline points="18 17 13 12 18 7"/>
   </svg>
 );
 
@@ -372,11 +373,10 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
 // Fills the whole hero, fades to transparent toward the top via a mask,
 // and drifts very slowly so it barely reads as "moving" but never feels static.
 
-// ─── AURORA BACKGROUND (Gemini-style, CSS-only / GPU-composited) ─────────────
+// ─── AURORA BACKGROUND (static gradient, no animation) ───────────────────────
 // Same visual language as before (soft bottom-anchored glow, fading toward
-// the top) but driven entirely by CSS @keyframes on transform/opacity so it
-// stays on the compositor thread and doesn't touch layout or paint-heavy
-// properties (blur/size/color are all static, never animated).
+// the top) but now a perfectly static composition — no @keyframes, no
+// transform/opacity animation of any kind. Just a fixed gradient wash.
 
 const AuroraBackground = ({ accent }: { accent: string }) => (
   <div
@@ -409,7 +409,7 @@ const AuroraBackground = ({ accent }: { accent: string }) => (
         );
       }
 
-      /* Static base wash — no animation, just sets the palette */
+      /* Static base wash — sets the palette */
       .aurora-wash {
         position: absolute;
         inset: 0;
@@ -423,7 +423,7 @@ const AuroraBackground = ({ accent }: { accent: string }) => (
         );
       }
 
-      /* Big soft center glow. Blur/size are fixed; only transform+opacity move. */
+      /* Big soft center glow — fixed in place, no animation. */
       .aurora-center-glow {
         position: absolute;
         left: 50%;
@@ -434,19 +434,12 @@ const AuroraBackground = ({ accent }: { accent: string }) => (
         border-radius: 9999px;
         filter: blur(220px);
         background: radial-gradient(circle, #2563eb 0%, transparent 70%);
-        opacity: 0.06;
-        will-change: transform;
-        transform: translateZ(0) scale(1);
-        backface-visibility: hidden;
-        animation: aurora-pulse 48s ease-in-out infinite;
+        opacity: 0.065;
       }
 
       .aurora-blob {
         position: absolute;
         border-radius: 9999px;
-        will-change: transform, opacity;
-        transform: translateZ(0);
-        backface-visibility: hidden;
       }
 
       .aurora-blob--accent {
@@ -457,7 +450,6 @@ const AuroraBackground = ({ accent }: { accent: string }) => (
         filter: blur(160px);
         background: var(--aurora-accent);
         opacity: 0.14;
-        animation: aurora-drift-a 42s ease-in-out infinite;
       }
 
       .aurora-blob--cyan {
@@ -468,8 +460,6 @@ const AuroraBackground = ({ accent }: { accent: string }) => (
         filter: blur(170px);
         background: #22d3ee;
         opacity: 0.1;
-        animation: aurora-drift-b 52s ease-in-out infinite;
-        animation-delay: -8s;
       }
 
       .aurora-blob--indigo {
@@ -480,77 +470,6 @@ const AuroraBackground = ({ accent }: { accent: string }) => (
         filter: blur(180px);
         background: #818cf8;
         opacity: 0.08;
-        animation: aurora-drift-c 60s ease-in-out infinite;
-        animation-delay: -20s;
-      }
-
-      /* All keyframes only touch transform + opacity → compositor-only,
-         no layout or paint invalidation. */
-      @keyframes aurora-pulse {
-        0% {
-          transform: translateZ(0) scale(1);
-          opacity: 0.06;
-        }
-        50% {
-          transform: translateZ(0) scale(1.08);
-          opacity: 0.075;
-        }
-        100% {
-          transform: translateZ(0) scale(1);
-          opacity: 0.06;
-        }
-      }
-
-      @keyframes aurora-drift-a {
-        0% {
-          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-        }
-        33% {
-          transform: translate3d(60px, -20px, 0) scale(1.1) rotate(6deg);
-        }
-        66% {
-          transform: translate3d(-35px, 15px, 0) scale(0.95) rotate(-5deg);
-        }
-        100% {
-          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-        }
-      }
-
-      @keyframes aurora-drift-b {
-        0% {
-          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-        }
-        33% {
-          transform: translate3d(-45px, 20px, 0) scale(0.92) rotate(-6deg);
-        }
-        66% {
-          transform: translate3d(35px, -15px, 0) scale(1.08) rotate(4deg);
-        }
-        100% {
-          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-        }
-      }
-
-      @keyframes aurora-drift-c {
-        0% {
-          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-        }
-        33% {
-          transform: translate3d(25px, -15px, 0) scale(1.08) rotate(5deg);
-        }
-        66% {
-          transform: translate3d(-50px, 12px, 0) scale(0.9) rotate(-6deg);
-        }
-        100% {
-          transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-        }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .aurora-center-glow,
-        .aurora-blob {
-          animation: none;
-        }
       }
     `}</style>
   </div>
@@ -673,14 +592,27 @@ export default function AIChat() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadingConversations, setLoadingConversations] = useState(true);
   const [streamingContent, setStreamingContent] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, Feedback>>({});
 
   // UI state
+  // Single flag drives both the desktop rail and the mobile drawer — which
+  // one actually shows is decided purely by responsive (md:) classes, so
+  // there's no risk of the two getting out of sync.
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Auto-close the drawer after an action (like picking a conversation) —
+  // but only on mobile, where the sidebar is an overlay. On desktop the
+  // rail should stay put.
+  const closeSidebarOnMobile = useCallback(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      setSidebarOpen(false);
+    }
+  }, []);
   const [showPersonaModal, setShowPersonaModal] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
 
@@ -730,6 +662,7 @@ export default function AIChat() {
   // ─── SUPABASE ─────────────────────────────────────────────────────────────
 
   const loadUserProfile = async () => {
+    setLoadingProfile(true);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
@@ -746,10 +679,13 @@ export default function AIChat() {
     } catch (err) {
       console.error('Error loading user profile:', err);
       setError('Failed to load user profile');
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
   const loadConversations = async () => {
+    setLoadingConversations(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -762,6 +698,8 @@ export default function AIChat() {
       if (data) setConversations(data);
     } catch (err) {
       console.error('Error loading conversations:', err);
+    } finally {
+      setLoadingConversations(false);
     }
   };
 
@@ -789,7 +727,7 @@ export default function AIChat() {
         setSelectedPersona(persona);
       }
       setActiveConversationId(convId);
-      setMobileSidebarOpen(false);
+      closeSidebarOnMobile();
     } catch (err) {
       console.error('Error loading conversation:', err);
     }
@@ -1205,20 +1143,41 @@ export default function AIChat() {
     setActiveConversationId(null);
     setInput('');
     setStreamingContent('');
-    setMobileSidebarOpen(false);
+    closeSidebarOnMobile();
     setError(null);
     setGreeting(pickFallbackGreeting());
     inputRef.current?.focus();
-  }, []);
+  }, [closeSidebarOnMobile]);
 
   const getAvatarInitial = () =>
     (userProfile?.name?.[0] || userProfile?.email?.[0] || 'U').toUpperCase();
 
   const handleLoadConversation = useCallback(loadConversation, [conversations]);
   const handleToggleHistory = useCallback(() => setHistoryOpen(o => !o), []);
-  const handleSidebarCollapse = useCallback(() => {
-    setSidebarOpen(false);
-    setMobileSidebarOpen(false);
+
+  // Single control for the sidebar drawer — toggles both the desktop rail
+  // and the mobile overlay from one button in the header (they're the same
+  // state now, so one flip is all it takes).
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarOpen(o => !o);
+  }, []);
+
+  const handleRenameConversation = useCallback(async (id: string, newTitle: string) => {
+    setConversations(prev => prev.map(c => (c.id === id ? { ...c, title: newTitle } : c)));
+    try {
+      const { error } = await supabase.from('ai_conversations').update({ title: newTitle }).eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error renaming conversation:', err);
+    }
+  }, []);
+
+  const handlePinConversation = useCallback((id: string) => {
+    setConversations(prev => prev.map(c => (c.id === id ? { ...c, pinned: !c.pinned } : c)));
+  }, []);
+
+  const handleOpenConversationNewTab = useCallback((id: string) => {
+    window.open(`${window.location.pathname}?conv=${id}`, '_blank', 'noopener,noreferrer');
   }, []);
 
   // ─── COMPOSER ───────────────────────────────────────────────────────────
@@ -1316,7 +1275,11 @@ export default function AIChat() {
               onLoadConversation={handleLoadConversation}
               onDeleteConversation={deleteConversation}
               onToggleHistory={handleToggleHistory}
-              onCollapse={handleSidebarCollapse}
+              onRenameConversation={handleRenameConversation}
+              onPinConversation={handlePinConversation}
+              onOpenConversationNewTab={handleOpenConversationNewTab}
+              loadingConversations={loadingConversations}
+              loadingProfile={loadingProfile}
             />
           </motion.aside>
         )}
@@ -1324,12 +1287,14 @@ export default function AIChat() {
 
       {/* MOBILE SIDEBAR */}
       <AnimatePresence>
-        {mobileSidebarOpen && (
+        {sidebarOpen && (
           <>
+            {/* Translucent backdrop — dims the page just enough to focus the
+                drawer without hiding the chat behind it completely. */}
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="md:hidden fixed inset-0 bg-black z-40"
-              onClick={() => setMobileSidebarOpen(false)}
+              className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40"
+              onClick={() => setSidebarOpen(false)}
             />
             <motion.aside
               initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
@@ -1345,7 +1310,11 @@ export default function AIChat() {
                 onLoadConversation={handleLoadConversation}
                 onDeleteConversation={deleteConversation}
                 onToggleHistory={handleToggleHistory}
-                onCollapse={handleSidebarCollapse}
+                onRenameConversation={handleRenameConversation}
+                onPinConversation={handlePinConversation}
+                onOpenConversationNewTab={handleOpenConversationNewTab}
+                loadingConversations={loadingConversations}
+                loadingProfile={loadingProfile}
               />
             </motion.aside>
           </>
@@ -1359,10 +1328,11 @@ export default function AIChat() {
         <header className="flex items-center justify-between px-4 h-12 flex-shrink-0">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { setSidebarOpen(o => !o); setMobileSidebarOpen(o => !o); }}
-              className="text-[#666] hover:text-white transition-colors p-1"
+              onClick={handleToggleSidebar}
+              title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+              className="text-[#666] hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
             >
-              {sidebarOpen ? <CollapseIcon /> : <MenuIcon />}
+              <SidebarToggleIcon open={sidebarOpen} />
             </button>
           </div>
 
